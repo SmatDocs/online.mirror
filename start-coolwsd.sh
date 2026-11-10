@@ -21,8 +21,16 @@ CLIENT_PORT="${COOLWSD_PORT:-9980}"
 SYS_TEMPLATE_PATH="${COOLWSD_SYS_TEMPLATE_PATH:-${SCRIPT_DIR}/systemplate}"
 CHILD_ROOT_PATH="${COOLWSD_CHILD_ROOT_PATH:-${SCRIPT_DIR}/jails}"
 CACHE_PATH="${COOLWSD_CACHE_PATH:-${SCRIPT_DIR}/cache}"
-ADMIN_USERNAME="${COOLWSD_ADMIN_USERNAME:-admin}"
-ADMIN_PASSWORD="${COOLWSD_ADMIN_PASSWORD:-admin}"
+# Admin console: enabled only with an explicitly configured password. It used to
+# default to admin/admin, which left the public admin page open (found 2026-11-10).
+ADMIN_ARGS=(--o:admin_console.enable=false)
+if [[ -n "${COOLWSD_ADMIN_PASSWORD:-}" && "${COOLWSD_ADMIN_PASSWORD}" != "admin" ]]; then
+  ADMIN_ARGS=(
+    --o:admin_console.enable=true
+    --o:admin_console.username="${COOLWSD_ADMIN_USERNAME:-overten-admin}"
+    --o:admin_console.password="${COOLWSD_ADMIN_PASSWORD}"
+  )
+fi
 CONTENT_SECURITY_POLICY="${COOLWSD_CONTENT_SECURITY_POLICY:-frame-ancestors *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com;}"
 LOG_LEVEL="${COOLWSD_LOG_LEVEL:-warning}"
 LOG_LEVEL_STARTUP="${COOLWSD_LOG_LEVEL_STARTUP:-warning}"
@@ -40,8 +48,7 @@ exec "${SCRIPT_DIR}/coolwsd" \
   --o:security.enable_macros_execution=true \
   --o:ssl.enable=false \
   --o:ssl.termination=true \
-  --o:admin_console.username="${ADMIN_USERNAME}" \
-  --o:admin_console.password="${ADMIN_PASSWORD}" \
+  "${ADMIN_ARGS[@]}" \
   --o:net.content_security_policy="${CONTENT_SECURITY_POLICY}" \
   --o:logging.level="${LOG_LEVEL}" \
   --o:logging.level_startup="${LOG_LEVEL_STARTUP}" \
