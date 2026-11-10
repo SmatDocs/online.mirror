@@ -229,6 +229,16 @@ class Sidebar extends SidebarBase {
 		return this.deckState.targetDeckCommand;
 	}
 
+	shouldShowSidebar(): boolean {
+		return this.map.uiManager.getBooleanDocTypePref('ShowSidebar', false);
+	}
+
+	/// The dock may open for a deck payload only after an explicit request in this
+	/// session, or when this document type's ShowSidebar preference is on.
+	sidebarMayOpen(): boolean {
+		return this.deckState.showRequested || this.shouldShowSidebar();
+	}
+
 	changeDeck(unoCommand: string | null) {
 		if (unoCommand !== null && unoCommand !== undefined)
 			app.socket.sendMessage('uno ' + unoCommand);
@@ -316,7 +326,9 @@ class Sidebar extends SidebarBase {
 
 				this.builder.build(tempContainer, [this.model.getSnapshot()], false);
 
-				const keepClosed = this.formulaKeepsDockClosed();
+				// SmartDocs: deck payloads the engine sends on its own (startup) keep the
+				// dock closed; it opens on an explicit request or when ShowSidebar is on.
+				const keepClosed = this.formulaKeepsDockClosed() || !this.sidebarMayOpen();
 				this.setDeckState({ showRequested: false });
 
 				const showDock = !this.isVisible() && !keepClosed;

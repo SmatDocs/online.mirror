@@ -426,22 +426,6 @@ window.L.Control.NotebookbarDraw = window.L.Control.NotebookbarImpress.extend({
 
 		}
 
-		if (app.LOUtil.canOpenSettings()) {
-			content.push({
-				'type': 'separator',
-				'id': 'file-properties-break',
-				'orientation': 'vertical'
-			});
-
-			content.push({
-				'id': 'settings-dialog',
-				'type': 'bigtoolitem',
-				'text': _('Options'),
-				'command': '.uno:Settings',
-				'accessibility': { focusBack: false, combination: 'T', de: null }
-			});
-		}
-
 		return this.getTabPage('File', content);
 	},
 
@@ -1713,14 +1697,6 @@ window.L.Control.NotebookbarDraw = window.L.Control.NotebookbarImpress.extend({
 						'type': 'bigcustomtoolitem',
 						'text': _('Smart Picker'),
 						'command': 'remotelink',
-						'accessibility': { focusBack: true, combination: 'RL', de: null }
-					} : {},
-					(this.map['wopi'].EnableRemoteAIContent) ? {
-						'id': 'insert-insert-remote-ai-content',
-						'class': 'unoremoteaicontent',
-						'type': 'bigcustomtoolitem',
-						'text': _('Assistant'),
-						'command': 'remoteaicontent',
 						'accessibility': { focusBack: true, combination: 'RL', de: null }
 					} : {},
 					{

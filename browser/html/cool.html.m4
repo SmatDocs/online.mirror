@@ -120,6 +120,9 @@ m4_ifelse(APP, [true],
 </head>
 
   <body[]m4_ifelse(QTAPP, [true], [ class="qt-app"])>
+    <div id="initial-loading-screen" class="initial-loading-screen" role="status" aria-live="polite">
+      <span>Initializing...</span>
+    </div>
     <!--The "controls" div holds map controls such as the Zoom button and
         it's separated from the map in order to have the controls on the top
         of the page all the time.

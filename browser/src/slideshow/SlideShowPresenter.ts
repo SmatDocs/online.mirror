@@ -479,10 +479,12 @@ class SlideShowPresenter {
 				this.centerCanvas(),
 			);
 			this._fullscreenResizeObserver.observe(this._fullscreen);
+			this._postPresentationState('presenting', 'fullscreen_entered');
 		} else {
 			this._stopWatchingFullscreenSize();
 			// we need to cleanup current/prev slide
 			this._slideShowNavigator.quit();
+			this._postPresentationState('editing', 'fullscreen_exited');
 		}
 	}
 
@@ -541,6 +543,17 @@ class SlideShowPresenter {
 		// in Chrome so a later second attempt at launching a presentation
 		// fails
 		this._map.focus();
+		this._postPresentationState('editing', 'stop_fullscreen');
+	}
+
+	private _postPresentationState(state: string, reason: string) {
+		this._map.fire('postMessage', {
+			msgId: 'Presentation_State',
+			args: {
+				State: state,
+				Reason: reason,
+			},
+		});
 	}
 
 	private centerCanvas() {
@@ -1087,6 +1100,7 @@ class SlideShowPresenter {
 		}
 
 		this.sendSlideShowFollowMessage('endpresentation');
+		this._postPresentationState('exiting', 'end_presentation');
 		this.checkDarkMode(false);
 		this.setLeader(false);
 		this.setFollowing(false);

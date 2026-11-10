@@ -141,7 +141,7 @@ class UIManager extends window.L.Control {
 
 		this.map['stateChangeHandler'].setItemValue('toggledarktheme', 'false');
 		this.map['stateChangeHandler'].setItemValue('invertbackground', 'false');
-		this.map['stateChangeHandler'].setItemValue('showannotations', 'true');
+		this.map['stateChangeHandler'].setItemValue('showannotations', 'false');
 		this.map['stateChangeHandler'].setItemValue('presenterconsole', 'false');
 		this.map['stateChangeHandler'].setItemValue('presenttoall', 'false');
 
@@ -1351,37 +1351,17 @@ class UIManager extends window.L.Control {
 	}
 
 	/**
-	 * Initializes the sidebar based on saved state and preferences.
-	 * @returns True when the engine was asked to show the sidebar.
+	 * SmartDocs default: start each document with the sidebar hidden.
+	 * Users can still reopen it explicitly after load.
+	 * @returns True when the engine was asked to show the sidebar (never, at load).
 	 */
 	initializeSidebar(): boolean {
 		this.documentReadyForAI = true;
-		let sidebarRequested = false;
+		const sidebarRequested = false;
 
-		// Hide the sidebar on start if saved state or UIDefault is set.
 		if (window.mode.isDesktop() && !window.mode.isInteractivePreview()) {
-			var showSidebar = this.getBooleanDocTypePref('ShowSidebar', true);
-			const requestSidebar = () => {
-				app.socket.sendMessage('uno .uno:SidebarShow');
-				sidebarRequested = true;
-			};
-
-			if (showSidebar && this.getBooleanDocTypePref('PropertyDeck', true)) {
-				requestSidebar();
-				this.map.sidebar.setAsInitialized();
-			}
-
-			const deckCommand = showSidebar ? this.storedSidebarDeckCommand() : '';
-			if (deckCommand) {
-				requestSidebar();
-				app.socket.sendMessage('uno ' + deckCommand);
-				this.map.sidebar.setupTargetDeck(deckCommand);
-			}
-
-			if (showSidebar)
-				this.map.sidebar.setAsInitialized();
-			else
-				app.socket.sendMessage('uno .uno:SidebarHide');
+			this.resetSidebarForDocumentLoad();
+			app.socket.sendMessage('uno .uno:SidebarHide');
 		}
 		else if (window.mode.isChromebook() || window.mode.isSmallScreenDevice() || window.mode.isTablet()) {
 			// HACK - currently the sidebar shows when loaded,
@@ -1468,6 +1448,15 @@ class UIManager extends window.L.Control {
 		}
 
 		sidebar.show();
+	}
+
+	resetSidebarForDocumentLoad(): void {
+		// Make the browser-side visibility decision before core can deliver
+		// its first deck payload. Sending SidebarHide alone is asynchronous;
+		// without this preference the payload briefly opens the sidebar.
+		this.setDocTypePref('ShowSidebar', false);
+		if (this.map.sidebar && this.map.sidebar.isVisible())
+			this.map.sidebar.closeSidebar();
 	}
 
 	/**
@@ -2483,10 +2472,22 @@ class UIManager extends window.L.Control {
 	 */
 	blockUI(event: any): void {
 		this.blockedUI = true;
+		if (event?.reason === 'rename') {
+			// Saving and replacing the WOPI file must still reject mutations, but
+			// navigation is client-side and safe. Keep the canvas available for
+			// wheel/touch scrolling and use the title progress bar instead of a
+			// modal overlay that consumes every pointer event.
+			this.beginRenameInteraction();
+			return;
+		}
 		this.map.fire('showbusy', {label: event ? event.message : null});
 
 		const canvas = document.getElementById('document-canvas');
 		if (canvas) canvas.style.pointerEvents = 'none'; // To remove the need for checking isUIBlocked.
+	}
+
+	beginRenameInteraction(): void {
+		this.documentNameInput?.showLoadingAnimation();
 	}
 
 	/**

@@ -250,7 +250,10 @@ window.L.Map.include({
 		if (!filename) {
 			return;
 		}
-		this.showBusy(_('Renaming...'), false);
+		// Keep the document navigable while the server performs its atomic
+		// save/rename. Mutation commands are blocked separately by blockui.
+		this.uiManager.beginRenameInteraction();
+		app.socket.captureZoomBeforeRenameReload();
 		app.socket.sendMessage('renamefile filename=' + encodeURIComponent(filename));
 	},
 
@@ -318,9 +321,44 @@ window.L.Map.include({
 		app.socket.sendMessage(msg);
 	},
 
+	// SmartDocs: Writer table deletes go through DeleteTableClean.py, which removes
+	// the table (or rows/columns) together with the bookmarks the agents rely on.
+	sendDeleteTableCommand: function(command, json) {
+		if (json)
+			return false;
+
+		if (this.getDocType && this.getDocType() !== 'text')
+			return false;
+
+		var scriptFunction = null;
+		if (command === '.uno:DeleteTable')
+			scriptFunction = 'deleteCurrentTable';
+		else if (command === '.uno:DeleteRows')
+			scriptFunction = 'deleteCurrentRows';
+		else if (command === '.uno:DeleteColumns')
+			scriptFunction = 'deleteCurrentColumns';
+		else
+			return false;
+
+		app.socket.sendMessage('uno vnd.sun.star.script:DeleteTableClean.py$' + scriptFunction + '?language=Python&location=share');
+		return true;
+	},
 	sendUnoCommand: function (command, json, force) {
 		if (command.indexOf('.uno:') < 0 && command.indexOf('vnd.sun.star.script') < 0)
 			console.error('Trying to send uno command without prefix: "' + command + '"');
+
+		// Keep the browser-side visibility preference in sync before core sends
+		// the corresponding sidebar payload. This lets startup remain closed
+		// while an explicit user or host command can still open the sidebar.
+		if (command === '.uno:SidebarShow')
+			this.uiManager.setDocTypePref('ShowSidebar', true);
+		else if (command === '.uno:SidebarHide') {
+			// Hiding is a visibility command, not a deck selection. Handle it
+			// before the generic sidebar-deck branch can turn it into SidebarShow.
+			this.uiManager.resetSidebarForDocumentLoad();
+			app.socket.sendMessage('uno .uno:SidebarHide');
+			return;
+		}
 
 		if ((command.startsWith('.uno:Sidebar') && !command.startsWith('.uno:SidebarShow')) ||
 			command.startsWith('.uno:CustomAnimation') || command.startsWith('.uno:ModifyPage') ||
@@ -411,6 +449,12 @@ window.L.Map.include({
 			console.debug('Cannot execute: ' + command + ' when dialog is opened.');
 			this.dialog.blinkOpenDialog();
 		} else if (this.isEditMode() || isAllowedInReadOnly) {
+			if (this.sendDeleteTableCommand(command, json)) {
+				if (map.userList && map._docLayer && map._docLayer._viewId)
+					map.userList.followUser(map._docLayer._viewId, /* do instant scroll */ false);
+				return;
+			}
+
 			// A view that draws from the objects enters and leaves groups itself.
 			if (!GraphicSelection.takesTheCommand(command)) {
 				app.socket.sendMessage('uno ' + command + (json ? ' ' + JSON.stringify(json) : ''));

@@ -232,13 +232,6 @@ class BackstageView extends window.L.Class {
 				visible: !this.isStarterMode && window.mode.isCODesktop(),
 			},
 			{
-				id: 'options',
-				label: _('Options'),
-				type: 'action',
-				actionType: 'options',
-				visible: !this.isStarterMode,
-			},
-			{
 				id: 'about',
 				label: _('About'),
 				type: 'action',
