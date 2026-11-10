@@ -60,6 +60,9 @@ class Socket {
 	private _renderEventTimerStart: DOMHighResTimeStamp | undefined;
 	private _slurpTimerDelay: number | undefined;
 	private _slurpTimerLaunchTime: number | undefined;
+	private _zoomBeforeRenameReload: number | undefined;
+	private _renameZoomRestoreTimer: TimeoutHdl | undefined;
+	private _renameZoomRestoreAttempts: number = 0;
 	private timer: ReturnType<typeof setInterval> | undefined;
 	private workers: Worker[] = [];
 	private workerMessageHandlers: Map<string, any> = new Map();
@@ -86,6 +89,9 @@ class Socket {
 		this._renderEventTimerStart = undefined;
 		this._slurpTimerDelay = undefined;
 		this._slurpTimerLaunchTime = undefined;
+		this._zoomBeforeRenameReload = undefined;
+		this._renameZoomRestoreTimer = undefined;
+		this._renameZoomRestoreAttempts = 0;
 		this.timer = undefined;
 		this.socket = undefined;
 		this.traceEvents = new TraceEvents(this);
@@ -161,6 +167,54 @@ class Socket {
 		this.onWorkerError(null);
 	}
 
+	public captureZoomBeforeRenameReload(): void {
+		if (this._zoomBeforeRenameReload !== undefined) return;
+
+		const zoom = this._map.getZoom();
+		if (Number.isFinite(zoom)) {
+			if (this._renameZoomRestoreTimer) {
+				clearTimeout(this._renameZoomRestoreTimer);
+				this._renameZoomRestoreTimer = undefined;
+			}
+			this._zoomBeforeRenameReload = zoom;
+			this._renameZoomRestoreAttempts = 0;
+		}
+	}
+
+	public isRestoringZoomAfterRenameReload(): boolean {
+		return (
+			typeof this._zoomBeforeRenameReload === 'number' &&
+			Number.isFinite(this._zoomBeforeRenameReload)
+		);
+	}
+
+	private _restoreZoomAfterRenameReload(): void {
+		const zoom = this._zoomBeforeRenameReload;
+		if (typeof zoom !== 'number' || !Number.isFinite(zoom)) {
+			this._zoomBeforeRenameReload = undefined;
+			this._renameZoomRestoreAttempts = 0;
+			return;
+		}
+
+		if (this._renameZoomRestoreTimer)
+			clearTimeout(this._renameZoomRestoreTimer);
+
+		if (this._map.getZoom() !== zoom)
+			this._map.setZoom(zoom, { animate: false }, false);
+
+		this._renameZoomRestoreAttempts++;
+		if (this._renameZoomRestoreAttempts >= 40) {
+			this._zoomBeforeRenameReload = undefined;
+			this._renameZoomRestoreTimer = undefined;
+			this._renameZoomRestoreAttempts = 0;
+			return;
+		}
+
+		this._renameZoomRestoreTimer = setTimeout(() => {
+			this._restoreZoomAfterRenameReload();
+		}, 100);
+	}
+
 	// Wrap the active socket in a DelaySocket so all incoming and outgoing
 	// messages are delayed by delayMs (preserving FIFO order). No-op if
 	// already wrapped or no socket is connected.
@@ -205,7 +259,7 @@ class Socket {
 			return;
 		}
 
-		if (!app.idleHandler._active) {
+		if (!app.idleHandler._active && !this._map?.options?.alwaysActive) {
 			// Avoid communicating when we're inactive.
 			if (typeof msg !== 'string') return;
 
@@ -1205,6 +1259,8 @@ class Socket {
 			// b) docLayer._onStatusMsg (via _docLayer._onMessage)
 			// has set the viewid
 			this._handleDelayedMessages(this._map._docLayer);
+
+			this._restoreZoomAfterRenameReload();
 		}
 
 		this._maybeOfferExternalLinks(command);
@@ -2472,6 +2528,7 @@ class Socket {
 				showMsgAndReload = true;
 			}
 		} else if (textMsg.startsWith('reloadafterrename')) {
+			this.captureZoomBeforeRenameReload();
 			showMsgAndReload = true;
 		}
 
@@ -2603,6 +2660,9 @@ class Socket {
 				return true; // caller should exit immediately.
 			}
 
+			const suppressStorageWarn =
+				command.errorKind === 'saveunauthorized' ||
+				command.errorKind === 'savefailed';
 			// Skip empty errors (and allow for suppressing errors by making them blank).
 			if (storageError && storageError != '') {
 				// Parse the storage url as link
@@ -2611,11 +2671,15 @@ class Socket {
 				// Insert the storage server address to be more friendly
 				storageError = storageError.replace('%storageserver', tmpLink.host);
 
-				// show message to the user in Control.AlertDialog
-				this._map.fire('warn', {
-					msg: storageError,
-					errorDetail: storageErrorDetail,
-				});
+				// Suppress save permission/session warning modals while preserving
+				// save failure callbacks for host integrations.
+				if (!suppressStorageWarn) {
+					// show message to the user in Control.AlertDialog
+					this._map.fire('warn', {
+						msg: storageError,
+						errorDetail: storageErrorDetail,
+					});
+				}
 
 				// send to wopi handler so we can respond
 				const postMessageObj = {
@@ -2966,7 +3030,7 @@ class Socket {
 			);
 		}
 
-		this._map.fire('blockUI', { message: msg });
+		this._map.fire('blockUI', { message: msg, reason: textMsg });
 	}
 
 	// 'blockedcommand: ' message.

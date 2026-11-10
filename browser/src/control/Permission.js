@@ -32,14 +32,16 @@ window.L.Map.include({
 		// we warn the user about loosing the rich formatting and offer an option to
 		// save as ODF instead of the current format
 		//
-		// For mobile we need to display the edit button for all the cases except for PDF (which is read-only)
-		// we offer save-as to another place where the user can edit the document
 		// The mobile apps use local storage not WOPI, so BaseFileName will be empty.
 		// Fall back to the document URL which ends with the file name.
 		var fileName = this['wopi'].BaseFileName || this.options.doc || '';
 		var isPDF = fileName.toLowerCase().endsWith('.pdf');
 		const mobileLayout = window.mode.isSmallScreenDevice() || window.mode.isTablet();
-		if (!isPDF && mobileLayout) {
+		const firstOpen = this._permission === undefined;
+		const shouldGateFirstOpen = perm === 'edit' && firstOpen && this._shouldStartReadOnly();
+		// SmartDocs: show the edit button only when the user is actually in a viewing
+		// state. Mobile/tablet should not force writable documents to open in Viewing mode.
+		if (!isPDF && mobileLayout && (perm !== 'edit' || shouldGateFirstOpen)) {
 			button.css('display', 'flex');
 		} else {
 			button.hide();
@@ -49,13 +51,12 @@ window.L.Map.include({
 			// The opt-in gate applies when the doc is first opened. Later
 			// calls honor what was asked, except that on a mobile layout a
 			// view in the read-only stage stays there with its edit button.
-			const firstOpen = this._permission === undefined;
 			const stayReadOnly = !firstOpen && this._permission === 'readonly' && mobileLayout;
 			if (this.options.canTryLock) {
 				// This is a success response to an attempt to lock using mobile-edit-button
 				this._switchToEditMode();
 			}
-			else if ((firstOpen && (this._shouldStartReadOnly() || mobileLayout)) || stayReadOnly) {
+			else if (shouldGateFirstOpen || stayReadOnly) {
 				button.on('click', function () {
 					that._switchToEditMode();
 				});
@@ -851,7 +852,13 @@ window.L.Map.include({
 
 		app.events.fire('updatepermission', {perm : perm});
 
-		if (this._docLayer._docType === 'text' && (window.mode.isSmallScreenDevice() || window.mode.isTablet())) {
+		var renameZoomRestoreActive = !!(
+			app.socket
+			&& app.socket.isRestoringZoomAfterRenameReload
+			&& app.socket.isRestoringZoomAfterRenameReload()
+		);
+		if (this._docLayer._docType === 'text' && (window.mode.isSmallScreenDevice() || window.mode.isTablet())
+			&& !renameZoomRestoreActive) {
 			app.activeDocument.activeLayout.applyZoom(10);
 		}
 
