@@ -710,6 +710,16 @@ else
   OUTPUT_TO_FILE=false
 endif
 
+# Default run settings tuned for fast, production-like document open latency.
+RUN_FAST_LOG_LEVEL ?= warning
+RUN_FAST_LOG_LEVEL_STARTUP ?= warning
+RUN_FAST_LOG_FILE ?= false
+RUN_FAST_LOG_UI_CMD ?= false
+RUN_FAST_TRACE_EVENT ?= false
+RUN_FAST_BROWSER_LOGGING ?= false
+RUN_FAST_LOG_PROTOCOL ?= false
+RUN_FAST_PRESPAWN_CHILDREN ?= 4
+
 QUIET_SAMPLES = $(QUIET_SAMPLES_$(V))
 QUIET_SAMPLES_ = $(QUIET_SAMPLES_$(AM_DEFAULT_VERBOSITY))
 QUIET_SAMPLES_0 = @echo "  SAMPLES " $@;
@@ -718,18 +728,24 @@ QUIET_SBOM = $(QUIET_SBOM_$(V))
 QUIET_SBOM_ = $(QUIET_SBOM_$(AM_DEFAULT_VERBOSITY))
 QUIET_SBOM_0 = @echo "  SBOM    " $@;
 
-setup-wsd: all @JAILS_PATH@ @CACHE_PATH@ presets-dir build-samples
+setup-wsd: all @JAILS_PATH@ @CACHE_PATH@ presets-dir build-samples overten-registry
 	@echo "Launching coolwsd"
 	@fc-cache "@LO_PATH@"/share/fonts/truetype
 	@echo
 
+# SmartDocs/Overten engine defaults (replaces the coolkitconfig.xcu layer upstream removed).
+overten-registry:
+	@cp ${top_srcdir}/overten/registry/overten-defaults.xcd "@LO_PATH@"/share/registry/
+
 COMMON_PARAMS = \
 	$(FIND_FREE_PORT_PARAM) \
+	--disable-ssl \
 	$(if $(TEST_APPARMOR),--disable-cool-user-checking) \
 	--o:sys_template_path="@SYSTEMPLATE_PATH@" \
 	--o:child_root_path="@JAILS_PATH@" \
 	--o:cache_files.path="@CACHE_PATH@" \
 	--o:storage.filesystem[@allow]=true \
+	--o:security.enable_macros_execution=true \
 	--o:ssl.cert_file_path="$(abs_top_srcdir)/etc/cert.pem" \
 	--o:ssl.key_file_path="$(abs_top_srcdir)/etc/key.pem" \
 	--o:ssl.ca_file_path="$(abs_top_srcdir)/etc/ca-chain.cert.pem" \
@@ -750,6 +766,16 @@ run: setup-wsd
 			$(RUN_EXTRA)
 
 namespace-run: setup-wsd check-apparmour-namespaces $(SYSTEM_STAMP)
+	$(ENABLE_NAMESPACE) ./coolwsd $(COMMON_PARAMS) \
+			--o:logging.file[@enable]=${RUN_FAST_LOG_FILE} --o:logging.level=${RUN_FAST_LOG_LEVEL} \
+			--o:logging.level_startup=${RUN_FAST_LOG_LEVEL_STARTUP} \
+			--o:logging_ui_cmd.file[@enable]=${RUN_FAST_LOG_UI_CMD} \
+			--o:trace_event[@enable]=${RUN_FAST_TRACE_EVENT} \
+			--o:logging.protocol=${RUN_FAST_LOG_PROTOCOL} \
+			--o:browser_logging=${RUN_FAST_BROWSER_LOGGING} \
+			--o:num_prespawn_children=${RUN_FAST_PRESPAWN_CHILDREN}
+
+run-debug: setup-wsd check-apparmour-namespaces
 	$(ENABLE_NAMESPACE) ./coolwsd $(COMMON_PARAMS) \
 			--o:logging.file[@enable]=${OUTPUT_TO_FILE} --o:logging.level=trace \
 			--o:logging_ui_cmd.file[@enable]=${OUTPUT_TO_FILE} \
@@ -1169,4 +1195,4 @@ sbom-freshness: collabora-online-sbom.spdx.json
 		$(ENGINE_BUILDDIR)/workdir/CustomTarget/instsetoo_native/sbom/collaboraofficebasis-core-sbom.spdx.json \
 		$(abs_top_builddir)/collabora-online-sbom.spdx.json
 
-.PHONY: cleanup setup-wsd systemplate sbom-check sbom-audit sbom-freshness
+.PHONY: cleanup setup-wsd overten-registry systemplate sbom-check sbom-audit sbom-freshness

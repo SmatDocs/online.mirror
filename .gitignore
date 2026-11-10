@@ -10,6 +10,7 @@
 .yavide_proj
 .yavide_session
 /.vscode
+.deploy/
 Doxyfile.cpp.cfg
 doc/cpp/**
 **/.clangd
@@ -53,6 +54,8 @@ macos/coolwsd/gmake-wrapper.sh
 macos/coda/coda/Assets.xcassets
 /qt/run-from-build
 __pycache__/
+scripts/__pycache__
+scripts/deploy/lo-python-scripts/
 
 # Test stuff
 systemplate
@@ -73,10 +76,9 @@ test/samples/calc-edit.ods
 test/samples/writer-large-edit.fodt
 cypress_test/test/data/presets/user/browsersetting.json
 cypress_test/test/data/presets/user/standard.dic
-test/clienttest
 test/fakesockettest
 test/unithttplib
-test/unittest
+test/clienttest
 test/*.csv
 test/data/presets/user/browsersettings.json
 jsstress
@@ -90,8 +92,6 @@ coolwsd.log
 .log
 *.lo
 *.mo
-*.tmp
-*.sw?
 
 # snapcraft pack drops the built package in the working directory
 *.snap
