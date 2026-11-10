@@ -49,7 +49,7 @@ window.L.Map.WOPI = window.L.Handler.extend({
 	AIEthicalRating: 'U',
 	EnableShare: false,
 	HideUserList: null,
-	CallPythonScriptSource: null,
+	CallPythonScriptRequests: null,
 	SupportsRename: false,
 	UserCanRename: false,
 	UserCanWrite: false,
@@ -345,6 +345,8 @@ window.L.Map.WOPI = window.L.Handler.extend({
 	},
 
 	resetAppLoaded: function() {
+		var wasInitializedUI = this._appLoaded || this._appLoadedConditions.initializedui;
+		this._map.uiManager.resetSidebarForDocumentLoad();
 		this._appLoaded = false;
 		for (var key in this._appLoadedConditions) {
 			// this happens when we reload document eg. save as
@@ -353,6 +355,13 @@ window.L.Map.WOPI = window.L.Handler.extend({
 			if (key === 'initializedui') continue;
 
 			this._appLoadedConditions[key] = false;
+		}
+
+		// Socket reconnects after WOPI rename reuse the existing UI. The
+		// specialized UI was already initialized on the first load, so no new
+		// initializedui event is emitted.
+		if (wasInitializedUI) {
+			this._appLoadedConditions.initializedui = true;
 		}
 	},
 
@@ -491,6 +500,83 @@ window.L.Map.WOPI = window.L.Handler.extend({
 			app.socket.sendMessage('closedocument');
 			return;
 		}
+
+		var postPresentationState = function(state, reason) {
+			this._map.fire('postMessage', {
+				msgId: 'Presentation_State',
+				args: {
+					State: state,
+					Reason: reason || null
+				}
+			});
+		}.bind(this);
+
+		var dismissAlreadyPresentingModal = function() {
+			if (this._map.uiManager && typeof this._map.uiManager.closeModal === 'function') {
+				var dialogId = typeof this._map.uiManager.generateModalId === 'function'
+					? this._map.uiManager.generateModalId('already-presenting-modal')
+					: 'already-presenting-modal';
+				this._map.uiManager.closeModal(dialogId);
+			}
+			var response = document.getElementById('already-presenting-modal-response');
+			if (response)
+				response.click();
+		}.bind(this);
+
+		var hasActivePresentation = function() {
+			var presenter = app.map && app.map.slideShowPresenter;
+			if (presenter) {
+				if (typeof presenter._checkAlreadyPresenting === 'function' && presenter._checkAlreadyPresenting())
+					return true;
+				if (presenter._slideShowCanvas)
+					return true;
+			}
+			var legacySlideShow = this._map.slideShow;
+			if (legacySlideShow) {
+				if (legacySlideShow._slideShow)
+					return true;
+				if (legacySlideShow._slideShowWindowProxy && !legacySlideShow._slideShowWindowProxy.closed)
+					return true;
+			}
+			return false;
+		}.bind(this);
+
+		var endActivePresentation = function(reason) {
+			dismissAlreadyPresentingModal();
+			var ended = false;
+			var presenter = app.map && app.map.slideShowPresenter;
+			if (presenter && typeof presenter.endPresentation === 'function') {
+				presenter.endPresentation(true);
+				ended = true;
+			}
+			var legacySlideShow = this._map.slideShow;
+			if (legacySlideShow) {
+				if (legacySlideShow._slideShowWindowProxy && !legacySlideShow._slideShowWindowProxy.closed) {
+					legacySlideShow._slideShowWindowProxy.close();
+					legacySlideShow._slideShowWindowProxy = null;
+					legacySlideShow._slideShow = null;
+					ended = true;
+				}
+				else if (legacySlideShow._slideShow && typeof legacySlideShow._stopFullScreen === 'function') {
+					legacySlideShow._stopFullScreen();
+					ended = true;
+				}
+			}
+			postPresentationState('editing', reason || 'end_presentation');
+			return ended;
+		}.bind(this);
+
+		var startPresentationFromSlide = function(slideNumber, reason) {
+			var presentationArgs = {};
+			if (typeof slideNumber !== 'undefined')
+				presentationArgs.startSlideNumber = slideNumber;
+			postPresentationState('entering', reason || 'start_presentation');
+			if (window.canvasSlideshowEnabled) {
+				this._map.fire('newfullscreen', presentationArgs);
+			} else {
+				this._map.fire('fullscreen', presentationArgs);
+			}
+		}.bind(this);
 
 		// Exception: UI modification can be done before WOPIPostmessageReady was fulfilled
 		if (msg.MessageId === 'Show_Button' || msg.MessageId === 'Hide_Button' || msg.MessageId === 'Remove_Button') {
@@ -635,6 +721,16 @@ window.L.Map.WOPI = window.L.Handler.extend({
 			this._map.uiManager.map.contextToolbar.insertAdditionalContextButton(msg.Values);
 			return;
 		}
+		else if (msg.MessageId === 'Send_Dispatcher_Action' && msg.Values && msg.Values.Action) {
+			// SmartDocs: allow the host to invoke COOL dispatcher actions (zoomin, zoomout, etc).
+			// This is what the COOL UI uses internally and affects COOL's map state
+			// directly (unlike Send_UNO_Command which only affects LO's internal state).
+			// The frontend uses it to restore zoom after a rename reload.
+			if (app.dispatcher) {
+				app.dispatcher.dispatch(msg.Values.Action, msg.Values.Data);
+			}
+			return;
+		}
 		else if (msg.MessageId === 'Send_UNO_Command' && msg.Values && msg.Values.Command) {
 			// Commands to insert comments without args initiate interactive insertion,
 			// showing in-place editor, and in PDF, entering a click-to-place mode.
@@ -710,6 +806,12 @@ window.L.Map.WOPI = window.L.Handler.extend({
 
 		if (msg.MessageId === 'Grab_Focus') {
 			app.idleHandler._activate();
+			if (app.idleHandler._documentIdle) {
+				window.app.console.debug('Grab_Focus: reactivating idle document');
+				app.map.fire('postMessage', {msgId: 'User_Active'});
+				app.idleHandler._documentIdle = false;
+				app.setCursorVisibility(true);
+			}
 			app.map.focus();
 			return;
 		}
@@ -723,9 +825,11 @@ window.L.Map.WOPI = window.L.Handler.extend({
 		// when user goes idle we have 'this._appLoaded == false'
 		if (msg.MessageId === 'Get_User_State') {
 			var isIdle = app.idleHandler.isDimActive();
+			var isDocIdle = app.idleHandler._documentIdle;
 			this._postMessage({msgId: 'Get_User_State_Resp', args: {
-				State: (isIdle ? 'idle' : 'active'),
-				Elapsed: app.idleHandler.getElapsedFromActivity()
+				State: (isDocIdle ? 'document_idle' : (isIdle ? 'idle' : 'active')),
+				Elapsed: app.idleHandler.getElapsedFromActivity(),
+				Reloading: isDocIdle
 			}});
 		}
 
@@ -739,7 +843,13 @@ window.L.Map.WOPI = window.L.Handler.extend({
 			if (msg.Values) {
 				var alwaysActive = msg.Values.AlwaysActive;
 				this._map.options.alwaysActive = !!alwaysActive;
+				if (alwaysActive) {
+					app.idleHandler.refreshVisibleTilesAfterActivation('host_always_active');
+				}
 			}
+		}
+		else if (msg.MessageId === 'Refresh_Visible_Area') {
+			app.idleHandler.refreshVisibleTilesAfterActivation('host_visible');
 		}
 		else if (msg.MessageId === 'Get_Views') {
 			this._postViewsMessage('Get_Views_Resp');
@@ -770,20 +880,56 @@ window.L.Map.WOPI = window.L.Handler.extend({
 		else if (msg.MessageId === 'Action_Fullscreen') {
 			app.util.toggleFullScreen();
 		}
+		else if (msg.MessageId === 'Action_SetPart' && this._map.getDocType() === 'presentation') {
+			if (!msg.Values) {
+				window.app.console.error('Property "Values" not set');
+				return;
+			}
+			var targetPart;
+			if (typeof msg.Values.Part !== 'undefined') {
+				targetPart = parseInt(msg.Values.Part);
+			} else if (typeof msg.Values.SlideIndex !== 'undefined') {
+				targetPart = parseInt(msg.Values.SlideIndex) - 1;
+			}
+			if (isNaN(targetPart) || targetPart < 0) {
+				window.app.console.error('Invalid Action_SetPart target: ' + targetPart);
+				return;
+			}
+			this._map.setPart(targetPart, false, true);
+		}
+		else if (msg.MessageId === 'Action_EndPresentation' && this._map.getDocType() === 'presentation') {
+			postPresentationState('exiting', msg.Values && msg.Values.reason || 'action_end_presentation');
+			endActivePresentation(msg.Values && msg.Values.reason || 'action_end_presentation');
+		}
+		else if (msg.MessageId === 'Action_PresentationCurrentSlide' && this._map.getDocType() === 'presentation') {
+			var currentSlideNumber = this._map.getCurrentPartNumber();
+			var currentSlideReason = msg.Values && msg.Values.Source || 'action_presentation_current_slide';
+			if (hasActivePresentation()) {
+				endActivePresentation('restart_current_slide');
+				setTimeout(function() {
+					startPresentationFromSlide(currentSlideNumber, currentSlideReason);
+				}, 350);
+			} else {
+				startPresentationFromSlide(currentSlideNumber, currentSlideReason);
+			}
+		}
 		else if (msg.MessageId === 'Action_FullscreenPresentation' && this._map.getDocType() === 'presentation') {
+			var slideNumber;
 			if (msg.Values) {
-				var slideNumber;
 				if (typeof msg.Values.StartSlideNumber != 'undefined') {
 					slideNumber = msg.Values.StartSlideNumber;
 				} else if (msg.Values.CurrentSlide) {
 					slideNumber = this._map.getCurrentPartNumber();
 				}
-				this._map.fire('fullscreen',
-					       {
-						       startSlideNumber: slideNumber
-					       });
+			}
+			var fullscreenReason = msg.Values && msg.Values.Source || 'action_fullscreen_presentation';
+			if (hasActivePresentation()) {
+				endActivePresentation('restart_fullscreen_presentation');
+				setTimeout(function() {
+					startPresentationFromSlide(slideNumber, fullscreenReason);
+				}, 350);
 			} else {
-				this._map.fire('fullscreen');
+				startPresentationFromSlide(slideNumber, fullscreenReason);
 			}
 		}
 		else if (msg.MessageId === 'Action_Print') {
@@ -797,6 +943,11 @@ window.L.Map.WOPI = window.L.Handler.extend({
 				fileName = fileName.substr(0, fileName.lastIndexOf('.'));
 				fileName = fileName === '' ? 'document' : fileName;
 				this._map.downloadAs(fileName + '.' + format, format);
+			}
+		}
+		else if (msg.MessageId === 'Action_RenameFile') {
+			if (msg.Values && msg.Values.Filename !== null && msg.Values.Filename !== undefined) {
+				this._map.renameFile(msg.Values.Filename);
 			}
 		}
 		else if (msg.MessageId == 'Action_InsertGraphic') {
@@ -959,8 +1110,24 @@ window.L.Map.WOPI = window.L.Handler.extend({
 		else if (msg.MessageId === 'CallPythonScript' &&
 			 Object.prototype.hasOwnProperty.call(msg, 'ScriptFile') &&
 			 Object.prototype.hasOwnProperty.call(msg, 'Function')) {
-			this._map.CallPythonScriptSource = e.source;
-			this._map.sendUnoCommand('vnd.sun.star.script:' + msg.ScriptFile + '$' + msg.Function + '?language=Python&location=share', msg.Values);
+			var pythonCommandName = 'vnd.sun.star.script:' + msg.ScriptFile + '$' + msg.Function + '?language=Python&location=share';
+			var now = Date.now();
+			var requests = window.CallPythonScriptBridge.registerRequest(
+				this._map.CallPythonScriptRequests,
+				{
+				commandName: pythonCommandName,
+				requestedAt: now,
+				source: e.source,
+				},
+				now
+			);
+			this._map.CallPythonScriptRequests = requests;
+			window.app.console.log('[CallPythonScript][' + new Date(now).toISOString() + '] registered', {
+				commandName: pythonCommandName,
+				pendingCount: requests.length,
+				values: msg.Values,
+			});
+			this._map.sendUnoCommand(pythonCommandName, msg.Values);
 		}
 		else if (msg.MessageId === 'Action_RemoveView') {
 			if (msg.Values && msg.Values.ViewId !== null && msg.Values.ViewId !== undefined) {
