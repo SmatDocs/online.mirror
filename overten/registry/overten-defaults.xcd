@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SmartDocs/Overten engine defaults. Upstream removed the coolkitconfig.xcu layer
+  (cc407a8717e7), so these overrides ship as an extra registry file that
+  LibreOffice loads from <instdir>/share/registry/*.xcd.
+-->
+<oor:data xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oor="http://openoffice.org/2001/registry">
+  <!-- Spelling off by default; users can re-enable it via Tools > Automatic Spell Checking. -->
+  <oor:component-data oor:package="org.openoffice.Office" oor:name="Linguistic">
+    <node oor:name="SpellChecking">
+      <prop oor:name="IsSpellAuto" oor:op="fuse"><value>false</value></prop>
+    </node>
+    <!-- Grammar checking off by default. The old coolkitconfig used a key that does not
+         exist (SpellChecking/IsGrammarAuto), so this is the first time it takes effect. -->
+    <node oor:name="GrammarChecking">
+      <prop oor:name="IsAutoCheck" oor:op="fuse"><value>false</value></prop>
+    </node>
+  </oor:component-data>
+  <!-- No thumbnail inside saved files: saves CPU on every save; the app makes its own thumbnails. -->
+  <oor:component-data oor:package="org.openoffice.Office" oor:name="Common">
+    <node oor:name="Save">
+      <node oor:name="Document">
+        <prop oor:name="GenerateThumbnail" oor:op="fuse"><value>false</value></prop>
+      </node>
+    </node>
+  </oor:component-data>
+</oor:data>
