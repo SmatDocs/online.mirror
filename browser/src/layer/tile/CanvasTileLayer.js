@@ -437,6 +437,10 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 	},
 
 	_onDocumentBlur: function() {
+		if (this._map && this._map.options && this._map.options.alwaysActive) {
+			return;
+		}
+
 		// Reclaim the graphics memory of non-visible tiles when the document loses focus
 		// (which happens when the browser is minimised, switched away from or when switching
 		// tabs).
@@ -552,7 +556,7 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 			// the zoom level has changed
 			app.socket.sendMessage('clientzoom ' + newClientZoom);
 
-			if (!this._map._fatal && app.idleHandler._active && app.socket.connected())
+			if (!this._map._fatal && (app.idleHandler._active || this._map.options.alwaysActive) && app.socket.connected())
 				this._clientZoom = newClientZoom;
 		}
 	},
@@ -2428,13 +2432,33 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 			window.postMobileMessage('COMMANDRESULT ' + textMsg);
 		}
 
-		if (this._map.CallPythonScriptSource != null) {
-			this._map.CallPythonScriptSource.postMessage(JSON.stringify({'MessageId': 'CallPythonScript-Result',
-										     'SendTime': Date.now(),
-										     'Values': obj
-										    }),
-								     '*');
-			this._map.CallPythonScriptSource = null;
+		var pythonRequests = this._map.CallPythonScriptRequests;
+		if (Array.isArray(pythonRequests) && pythonRequests.length > 0) {
+			var sendTime = Date.now();
+			var matchedResult = window.CallPythonScriptBridge.takeMatchingResult(
+				pythonRequests, commandName, obj, sendTime);
+			if (matchedResult.completedRequest !== null) {
+				this._map.CallPythonScriptRequests = matchedResult.remainingRequests;
+				window.app.console.log('[CallPythonScript][' + new Date(sendTime).toISOString() + '] delivering result', {
+					commandName: commandName,
+					elapsedMs: sendTime - matchedResult.completedRequest.requestedAt,
+					pendingCount: matchedResult.remainingRequests.length,
+					result: obj,
+				});
+				window.app.console.log('[CallPythonScript][' + new Date(sendTime).toISOString() + '] postMessage payload\n' +
+					JSON.stringify(matchedResult.responseMessage, null, 2));
+				matchedResult.completedRequest.source.postMessage(
+					JSON.stringify(matchedResult.responseMessage), '*');
+			}
+			else {
+				window.app.console.log('[CallPythonScript][' + new Date().toISOString() + '] ignoring unrelated UNO result', {
+					commandName: commandName,
+					pendingCommands: pythonRequests.map(function(request) {
+						return request.commandName;
+					}),
+					result: obj,
+				});
+			}
 		}
 	},
 
@@ -3742,7 +3766,10 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 
 		if (this.isWriter()) {
 			const considerCommentWidthInOffset = () => {
-				if (app.activeDocument.partHasComments) {
+				const commentList = app.sectionContainer.getSectionWithName(app.CSections.CommentList.name);
+				const compactViewport = newSize.x / app.dpiScale < 768;
+				const commentsVisible = commentList.sectionProperties.show === true;
+				if (!compactViewport && commentsVisible && app.activeDocument.partHasComments) {
 					if ((recalcFirstFit || !this._includedCommentsInFirstFit)) {
 						bringCommentsIntoView = true;
 						this._includedCommentsInFirstFit = true;

@@ -312,6 +312,9 @@ public:
     size_t getTilesOnFlyUpperLimit() const;
     void removeOutdatedTilesOnFly(std::chrono::steady_clock::time_point now);
     void onTileProcessed(TileWireId wireId);
+    /// Clear all in-flight tile tracking, typically when a browser view returns
+    /// from background throttling and may never send the old tileprocessed acks.
+    size_t clearTilesOnFly(const char* reason);
     /// Remove a tile from the on-fly tracking (no logging if absent).
     /// Returns true if the wireId was found and removed.
     bool removeTileOnFly(TileWireId wireId);
@@ -685,6 +688,12 @@ private:
     void handleTileInvalidation(const std::string& message,
                                 const std::shared_ptr<DocumentBroker>& docBroker);
 
+    /// Repaint the current visible area after invalidations were skipped while the view had no surface.
+    bool requestVisibleAreaRepaint(const std::shared_ptr<DocumentBroker>& docBroker,
+                                   const char* reason);
+
+    bool isTileInsideVisibleArea(const TileDesc& tile) const;
+
     /// If this session is read-only because of failed lock, try to unlock and make it read-write.
     bool attemptLock(const std::shared_ptr<DocumentBroker>& docBroker);
 
@@ -778,6 +787,8 @@ private:
     /// part and mode until either of those changes.
     std::string _visibleAreaPart;
     int _visibleAreaMode;
+    /// The kit invalidated tiles while this view had no usable render surface.
+    bool _needsVisibleAreaRepaint;
 
     Poco::SharedPtr<Poco::JSON::Object> _browserSettingsJSON;
 

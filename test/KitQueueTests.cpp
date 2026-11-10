@@ -48,6 +48,8 @@ class KitQueueTests : public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST(testSenderQueueTileDeduplication);
     CPPUNIT_TEST(testSenderQueueTileDedupReportsDroppedWireId);
     CPPUNIT_TEST(testSenderQueueByteAccounting);
+    CPPUNIT_TEST(testSenderQueueInteractivePriority);
+    CPPUNIT_TEST(testSenderQueueTextSelectionDeduplication);
     CPPUNIT_TEST(testTileCacheKitHangBecomesStale);
 #if ENABLE_STALE_TILE_REISSUE
     CPPUNIT_TEST(testTileCacheStaleRenderIsReissued);
@@ -107,6 +109,8 @@ class KitQueueTests : public CPPUNIT_NS::TestFixture
     void testSenderQueueTileDeduplication();
     void testSenderQueueTileDedupReportsDroppedWireId();
     void testSenderQueueByteAccounting();
+    void testSenderQueueInteractivePriority();
+    void testSenderQueueTextSelectionDeduplication();
     void testTileCacheKitHangBecomesStale();
 #if ENABLE_STALE_TILE_REISSUE
     void testTileCacheStaleRenderIsReissued();
@@ -832,6 +836,76 @@ void KitQueueTests::testSenderQueueByteAccounting()
 // kit. Without a re-issue trigger, the entry sits there orphaned.
 // So in case throttled client tilecombine (5s limit) we would NOT re-issue
 // and leave this state with missing tiles on the client.
+
+// SmartDocs: interaction messages (cursor/selection) overtake queued tiles, so the
+// user's caret keeps up while an agent edit floods the queue with tile updates.
+void KitQueueTests::testSenderQueueInteractivePriority()
+{
+    constexpr std::string_view testname = __func__;
+
+    SenderQueue<std::shared_ptr<Message>> queue;
+
+    std::shared_ptr<Message> item;
+
+    queue.enqueue(std::make_shared<Message>(
+        "tile: nviewid=0 part=0 width=180 height=135 tileposx=0 tileposy=0 tilewidth=15875 tileheight=11906 ver=0",
+        Message::Dir::Out));
+    queue.enqueue(std::make_shared<Message>(
+        "tile: nviewid=0 part=1 width=180 height=135 tileposx=0 tileposy=0 tilewidth=15875 tileheight=11906 ver=0",
+        Message::Dir::Out));
+    queue.enqueue(std::make_shared<Message>("textselectionstart: 100,200,50,50", Message::Dir::Out));
+
+    LOK_ASSERT_EQUAL(static_cast<size_t>(3), queue.size());
+
+    LOK_ASSERT_EQUAL_STR(true, queue.dequeue(item));
+    LOK_ASSERT(item);
+    LOK_ASSERT_EQUAL(std::string("textselectionstart: 100,200,50,50"), msgStr(item));
+
+    LOK_ASSERT_EQUAL_STR(true, queue.dequeue(item));
+    LOK_ASSERT(item);
+    LOK_ASSERT_EQUAL(
+        std::string("tile: nviewid=0 part=0 width=180 height=135 tileposx=0 tileposy=0 tilewidth=15875 tileheight=11906 ver=0"),
+        msgStr(item));
+
+    // The out-of-order dequeue must keep the byte accounting exact.
+    LOK_ASSERT_EQUAL_STR(true, queue.dequeue(item));
+    LOK_ASSERT_EQUAL(static_cast<size_t>(0), queue.size());
+    LOK_ASSERT_EQUAL(static_cast<size_t>(0), queue.bytes());
+}
+
+void KitQueueTests::testSenderQueueTextSelectionDeduplication()
+{
+    constexpr std::string_view testname = __func__;
+
+    SenderQueue<std::shared_ptr<Message>> queue;
+
+    std::shared_ptr<Message> item;
+
+    queue.enqueue(std::make_shared<Message>("textselection: one", Message::Dir::Out));
+    queue.enqueue(std::make_shared<Message>("textselectionstart: start-one", Message::Dir::Out));
+    queue.enqueue(std::make_shared<Message>("textselectionend: end-one", Message::Dir::Out));
+    queue.enqueue(std::make_shared<Message>("textselection: two", Message::Dir::Out));
+    queue.enqueue(std::make_shared<Message>("textselectionstart: start-two", Message::Dir::Out));
+    queue.enqueue(std::make_shared<Message>("textselectionend: end-two", Message::Dir::Out));
+
+    LOK_ASSERT_EQUAL(static_cast<size_t>(3), queue.size());
+
+    LOK_ASSERT_EQUAL_STR(true, queue.dequeue(item));
+    LOK_ASSERT(item);
+    LOK_ASSERT_EQUAL(std::string("textselection: two"), msgStr(item));
+
+    LOK_ASSERT_EQUAL_STR(true, queue.dequeue(item));
+    LOK_ASSERT(item);
+    LOK_ASSERT_EQUAL(std::string("textselectionstart: start-two"), msgStr(item));
+
+    LOK_ASSERT_EQUAL_STR(true, queue.dequeue(item));
+    LOK_ASSERT(item);
+    LOK_ASSERT_EQUAL(std::string("textselectionend: end-two"), msgStr(item));
+
+    LOK_ASSERT_EQUAL(static_cast<size_t>(0), queue.size());
+    LOK_ASSERT_EQUAL(static_cast<size_t>(0), queue.bytes());
+}
+
 void KitQueueTests::testTileCacheKitHangBecomesStale()
 {
     constexpr std::string_view testname = __func__;

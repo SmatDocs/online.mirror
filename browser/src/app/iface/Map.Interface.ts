@@ -82,6 +82,7 @@ interface MapInterface extends Evented {
 		tileHeightTwips: number;
 		wopiSrc: string;
 		previousWopiSrc: string;
+		alwaysActive?: boolean | string;
 		zoom: number;
 		defaultZoom: number;
 	};

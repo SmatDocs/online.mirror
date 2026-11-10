@@ -24,6 +24,7 @@
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
 
+#include <algorithm>
 #include <deque>
 #include <mutex>
 
@@ -71,9 +72,49 @@ public:
 
         if (!_queue.empty())
         {
+            auto dequeueAt = [this, &item](typename std::deque<Item>::iterator it)
+            {
+                item = *it;
+                _queue.erase(it);
+                _totalBytes -= item->size();
+            };
+
+            const auto nextInteractive = std::find_if(
+                _queue.begin(), _queue.end(), [](const Item& candidate)
+                {
+                    return SenderQueue::isInteractionMessage(candidate);
+                });
+            if (_priorityBurstCount < kMaxInteractionBurst &&
+                nextInteractive != _queue.end())
+            {
+                dequeueAt(nextInteractive);
+                ++_priorityBurstCount;
+                return true;
+            }
+
+            if (_priorityBurstCount >= kMaxInteractionBurst)
+            {
+                const auto nextNonInteractive = std::find_if(
+                    _queue.begin(), _queue.end(), [](const Item& candidate)
+                    {
+                        return !SenderQueue::isInteractionMessage(candidate);
+                    });
+
+                if (nextNonInteractive != _queue.end())
+                {
+                    dequeueAt(nextNonInteractive);
+                    _priorityBurstCount = 0;
+                    return true;
+                }
+            }
+
             item = _queue.front();
             _queue.pop_front();
             _totalBytes -= item->size();
+            if (isInteractionMessage(item))
+                ++_priorityBurstCount;
+            else
+                _priorityBurstCount = 0;
             return true;
         }
 
@@ -191,7 +232,11 @@ private:
             }
         }
         else if (command == "invalidatecursor:" ||
-                 command == "setpart:")
+                 command == "setpart:" ||
+                 command == "textselection:" ||
+                 command == "textselectionstart:" ||
+                 command == "textselectionend:" ||
+                 command == "cursorvisible:")
         {
             // Remove previous identical entries of this command,
             // if any, and use most recent (incoming).
@@ -254,11 +299,23 @@ private:
     }
 
 private:
+    static constexpr std::size_t kMaxInteractionBurst = 4;
+
+    static bool isInteractionMessage(const Item& item)
+    {
+        return item->firstTokenMatches("textselection:") ||
+               item->firstTokenMatches("textselectionstart:") ||
+               item->firstTokenMatches("textselectionend:") ||
+               item->firstTokenMatches("invalidatecursor:") ||
+               item->firstTokenMatches("cursorvisible:");
+    }
+
     mutable std::mutex _mutex;
     std::deque<Item> _queue;
     /// Sum of the payload sizes of every item currently in the queue.
     std::size_t _totalBytes = 0;
     using queue_item_t = typename std::deque<Item>::value_type;
+    std::size_t _priorityBurstCount = 0;
 };
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

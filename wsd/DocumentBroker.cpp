@@ -4717,6 +4717,12 @@ void DocumentBroker::refreshLock()
         _lockCtx->clearRetry();
         _lockCtx->bumpTimer();
     }
+    else if (session->isReadOnly())
+    {
+        LOG_ERR("No non-readonly session to refresh lock with");
+        _lockCtx->clearRetry();
+        _lockCtx->bumpTimer();
+    }
     else
     {
         const std::string savingSessionId = session->getId();

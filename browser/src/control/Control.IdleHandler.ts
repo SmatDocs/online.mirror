@@ -37,6 +37,7 @@ class IdleHandler {
     _active: boolean = true;
     map: any;
 	dimId: string = app.idleHandlerId;
+	_visibleTileRefreshTimers: number[] = [];
 
 	getIdleMessage(): string {
 		if (this.map['wopi'] && this.map['wopi'].DisableInactiveMessages) {
@@ -55,6 +56,10 @@ class IdleHandler {
 	// time from the last activity in [s]
 	getElapsedFromActivity(): number {
 		return (Date.now() - this._lastActivity) / 1000;
+	}
+
+	isAlwaysActive(): boolean {
+		return !!this.map?.options?.alwaysActive;
 	}
 
 	refreshAnnotations() {
@@ -125,7 +130,7 @@ class IdleHandler {
 	}
 
 	_startInactiveTimer() {
-		if (this._serverRecycling || this._documentIdle || !this.map._docLoaded) {
+		if (this.isAlwaysActive() || this._serverRecycling || this._documentIdle || !this.map._docLoaded) {
 			return;
 		}
 
@@ -137,7 +142,7 @@ class IdleHandler {
 	}
 
 	_startOutOfFocusTimer() {
-		if (this._serverRecycling || this._documentIdle || !this.map._docLoaded) {
+		if (this.isAlwaysActive() || this._serverRecycling || this._documentIdle || !this.map._docLoaded) {
 			return;
 		}
 
@@ -153,6 +158,10 @@ class IdleHandler {
 	}
 
 	_dimIfInactive() {
+		if (this.isAlwaysActive()) {
+			return;
+		}
+
 		if (this.map._docLoaded && (this.getElapsedFromActivity() >= window.idleTimeoutSecs)) {
 			this._dim();
 		} else {
@@ -161,6 +170,11 @@ class IdleHandler {
 	}
 
 	_dim() {
+		if (this.isAlwaysActive()) {
+			this._active = true;
+			return;
+		}
+
 		if (this.map.slideShowPresenter && this.map.slideShowPresenter._checkAlreadyPresenting())
 			return; // do not stop presentation
 
@@ -230,7 +244,49 @@ class IdleHandler {
 		}
 	}
 
+	refreshVisibleTilesAfterActivation(reason: string) {
+		if (document.hidden || !app.map?._docLoaded) {
+			return;
+		}
+
+		this.notifyActive();
+		if (app.socket?.connected?.()) {
+			app.socket.sendMessage('useractive');
+		}
+		this._active = true;
+
+		for (const timer of this._visibleTileRefreshTimers) {
+			window.clearTimeout(timer);
+		}
+		this._visibleTileRefreshTimers = [];
+
+		const refreshTiles = () => {
+			if (document.hidden || !app.map?._docLoaded) {
+				return;
+			}
+
+			const docLayer = app.map._docLayer as any;
+			if (docLayer?._requestNewTiles) {
+				window.app.console.warn('Refreshing visible tiles after activation: ' + reason);
+				(TileManager as any).refreshTilesInBackground?.();
+				docLayer._sendClientZoom?.(true);
+				app.activeDocument?.activeLayout?.sendClientVisibleArea?.(true);
+				docLayer._requestNewTiles();
+				TileManager.resetPreFetching(true);
+			}
+		};
+
+		for (const delay of [0, 250, 1000]) {
+			this._visibleTileRefreshTimers.push(window.setTimeout(refreshTiles, delay));
+		}
+	}
+
 	_sendInactiveMessage() {
+		if (this.isAlwaysActive()) {
+			this._active = true;
+			return;
+		}
+
 		this.map._doclayer && this.map._docLayer._onMessage('textselection:', null);
 		this.map.fire('postMessage', {msgId: 'User_Idle'});
 		if (app.socket.connected()) {
@@ -240,6 +296,12 @@ class IdleHandler {
 
 	_deactivate() {
 		window.app.console.debug('IdleHandler: _deactivate()');
+
+		if (this.isAlwaysActive()) {
+			this._active = true;
+			this._stopOutOfFocusTimer();
+			return;
+		}
 
 		if (this._serverRecycling || this._documentIdle || !this.map._docLoaded) {
 			return;
@@ -263,3 +325,21 @@ class IdleHandler {
 
 // Initiate the class.
 app.idleHandler = new IdleHandler();
+
+document.addEventListener('visibilitychange', () => {
+	if (!document.hidden) {
+		app.idleHandler.refreshVisibleTilesAfterActivation('visibilitychange');
+	}
+});
+
+window.addEventListener('focus', () => {
+	app.idleHandler.refreshVisibleTilesAfterActivation('focus');
+});
+
+window.addEventListener('pageshow', () => {
+	app.idleHandler.refreshVisibleTilesAfterActivation('pageshow');
+});
+
+window.addEventListener('resize', () => {
+	app.idleHandler.refreshVisibleTilesAfterActivation('resize');
+});

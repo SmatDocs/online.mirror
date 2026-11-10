@@ -221,7 +221,11 @@ class ViewLayoutBase {
 
 		// The command counts as sent only while the connection is healthy, so the
 		// area goes out again after a drop.
-		if (!app.map._fatal && app.idleHandler._active && app.socket.connected())
+		if (
+			!app.map._fatal &&
+			(app.idleHandler._active || app.map.options.alwaysActive) &&
+			app.socket.connected()
+		)
 			this.clientVisibleAreaCommand = visibleAreaCommand;
 	}
 
