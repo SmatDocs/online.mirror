@@ -36,6 +36,7 @@
 
     <ai desc="AI assistant configuration. When enabled with credentials, all users on this instance get AI features without needing to configure them individually. Works with any OpenAI-compatible endpoint, including local/self-hosted models (Ollama, vLLM, LM Studio, etc.). No data is sent anywhere unless explicitly configured. Per-user WOPI settings and View Settings override these defaults.">
         <enabled desc="Master switch for AI features. When false, AI is disabled server-wide regardless of WOPI or per-user settings." type="bool" default="false">false</enabled>
+        <allow_user_settings desc="Overten: users may not configure their own AI provider; Collabora AI is off." type="bool" default="true">false</allow_user_settings>
         <api_url desc="Default AI provider base URL (e.g. http://localhost:11434 for local Ollama, https://api.openai.com for OpenAI, or https://generativelanguage.googleapis.com/v1beta/openai for Gemini). Must support the OpenAI-compatible chat completions endpoint." type="string" default="">https://generativelanguage.googleapis.com/v1beta/openai</api_url>
         <api_key desc="Default API key for the AI provider." type="string" default=""></api_key>
         <model desc="Default AI model name. For tool use (inspecting and editing the document) the model must support native function/tool calling - e.g. gemini-3-flash-preview, gpt-4o, llama3.1, qwen2.5. Models without it (e.g. base llama3, gemma) can still chat but cannot drive document tools." type="string" default="">gemini-3-flash-preview</model>
@@ -58,6 +59,7 @@
     <num_prespawn_children desc="Number of child processes to keep started in advance and waiting for new clients." type="uint" default="1">5</num_prespawn_children>
     <fetch_update_check desc="Every number of hours will fetch latest version data. Defaults to 10 hours." type="uint" default="10">10</fetch_update_check>
     <allow_update_popup desc="Allows notification about an update in the editor" type="bool" default="false">false</allow_update_popup>
+    <hide_legacy_script_warning desc="Hide the notice that an embedded script uses the legacy com.sun.star UNO API. Overten: our agent scripts use it, users must not see the notice." type="bool" default="false">true</hide_legacy_script_warning>
     <per_document desc="Document-specific settings, including LO Core settings.">
         <max_concurrency desc="The maximum number of threads to use while processing a document." type="uint" default="8">8</max_concurrency>
         <batch_priority desc="A (lower) priority for use by batch eg. convert-to processes to avoid starving interactive ones" type="uint" default="5">5</batch_priority>
