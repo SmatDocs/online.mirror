@@ -346,6 +346,10 @@ configure_args_for_slot() {
   done
   normalized_args+=("--with-lokit-path=$SLOT_ROOT/engine/include")
   normalized_args+=("--with-lo-path=$SLOT_ROOT/engine/instdir")
+  # Overten: never ship Collabora's stock branding theme (its branding.js sets the logo
+  # tooltip to "Collabora Online Development Edition (CODE)" and links to collaboraonline.com).
+  # 26.04 turns it on by default in debug builds; our name and logo come from coolwsd_prod.xml.
+  case " ${normalized_args[*]} " in *" --disable-branding "*) ;; *) normalized_args+=("--disable-branding") ;; esac
   printf '%s ' "${normalized_args[@]}"
 }
 
