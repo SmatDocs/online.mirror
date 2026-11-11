@@ -200,7 +200,7 @@ class Socket {
 			clearTimeout(this._renameZoomRestoreTimer);
 
 		if (this._map.getZoom() !== zoom)
-			this._map.setZoom(zoom, { animate: false }, false);
+			app.zoomControl?.zoomTo(zoom, undefined, false);
 
 		this._renameZoomRestoreAttempts++;
 		if (this._renameZoomRestoreAttempts >= 40) {

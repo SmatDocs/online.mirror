@@ -5380,7 +5380,7 @@ bool ClientSession::requestVisibleAreaRepaint(const std::shared_ptr<DocumentBrok
     if (!_clientVisibleArea.hasSurface() ||
         _tileWidthPixel == 0 || _tileHeightPixel == 0 ||
         _tileWidthTwips == 0 || _tileHeightTwips == 0 ||
-        (_clientSelectedPart == -1 && !_isTextDocument))
+        (_clientSelectedPart.empty() && !_isTextDocument))
     {
         LOG_WRN("Deferred visible area repaint is still waiting for a renderable view. "
                 << "visibleArea=" << _clientVisibleArea.getLeft() << ',' << _clientVisibleArea.getTop()
@@ -5401,7 +5401,8 @@ bool ClientSession::requestVisibleAreaRepaint(const std::shared_ptr<DocumentBrok
     };
 
     const CanonicalViewId canonicalViewId = getCanonicalViewId();
-    const int part = _isTextDocument ? 0 : _clientSelectedPart;
+    // Part ids are strings since 26.04; a text document has a single part.
+    const std::string part = (_isTextDocument && _clientSelectedPart.empty()) ? std::string("0") : _clientSelectedPart;
     const int mode = _clientSelectedMode;
 
     std::vector<TileDesc> tiles;

@@ -268,11 +268,11 @@ class IdleHandler {
 			const docLayer = app.map._docLayer as any;
 			if (docLayer?._requestNewTiles) {
 				window.app.console.warn('Refreshing visible tiles after activation: ' + reason);
-				(TileManager as any).refreshTilesInBackground?.();
+				RenderManager.refreshTilesInBackground();
 				docLayer._sendClientZoom?.(true);
 				app.activeDocument?.activeLayout?.sendClientVisibleArea?.(true);
 				docLayer._requestNewTiles();
-				TileManager.resetPreFetching(true);
+				RenderManager.resetPreFetching(true);
 			}
 		};
 
