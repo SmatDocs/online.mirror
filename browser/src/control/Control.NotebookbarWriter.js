@@ -509,19 +509,6 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 					'type': 'toolbox',
 					'children': [
 						{
-							'id': 'onboardingtour',
-							'type': 'bigcustomtoolitem',
-							'text': _('Show Tour'),
-							'icon': 'lc_onboardingtour.svg',
-							'command': 'onboardingtour',
-							'accessibility': { focusBack: false, combination: 'ST', de: null }
-						}
-					]
-				},
-				{
-					'type': 'toolbox',
-					'children': [
-						{
 							'id': 'online-help',
 							'type': 'bigtoolitem',
 							'text': _('Online Help'),
