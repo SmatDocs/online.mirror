@@ -1172,7 +1172,9 @@ class UIManager extends window.L.Control {
 		if (docType !== 'spreadsheet') {
 			const state = this.map['stateChangeHandler'].getItemValue('showannotations');
 			const shown = state === 'true' || state === true;
-			const show = this.getBooleanDocTypePref('ShowAnnotations', true);
+			// Overten: comments start hidden, as in our earlier editor (they are AI
+			// annotations); a user who shows them keeps that choice.
+			const show = this.getBooleanDocTypePref('ShowAnnotations', false);
 			if (show !== shown) this.map.showComments(show);
 		}
 
@@ -1217,7 +1219,8 @@ class UIManager extends window.L.Control {
 		}
 
 		if (this.map.sidebar) {
-			const show = this.getBooleanDocTypePref('ShowSidebar', true);
+			// Overten: closed unless chosen (same default as Sidebar.shouldShowSidebar).
+			const show = this.getBooleanDocTypePref('ShowSidebar', false);
 			if (!show) {
 				if (this.map.sidebar.isVisible()) app.socket.sendMessage('uno .uno:SidebarHide');
 			} else {
@@ -1489,7 +1492,8 @@ class UIManager extends window.L.Control {
 		// Record the saved on or off state before comments are imported. The
 		// comment list reads this value as it imports and shows or hides itself
 		// accordingly, so there is no comment section to act on here yet.
-		const showComments = this.getBooleanDocTypePref('ShowAnnotations', true);
+		// Overten: hidden unless the user chose to show them (see applyViewPreferences).
+		const showComments = this.getBooleanDocTypePref('ShowAnnotations', false);
 		const state = showComments ? 'true' : 'false';
 		this.map['stateChangeHandler'].setItemValue('showannotations', state);
 		this._map.fire('commandstatechanged', {commandName : 'showannotations', state : state});
