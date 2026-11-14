@@ -203,6 +203,7 @@ test_base_sources = \
 	UriTests.cpp \
 	UtilTests.cpp \
 	WhiteBoxTests.cpp \
+	WopiAvatarTests.cpp \
 	WopiProofTests.cpp
 
 # The test programs link the production code from the static libraries that gbuild builds for
