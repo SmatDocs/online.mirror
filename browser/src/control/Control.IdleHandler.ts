@@ -37,7 +37,9 @@ class IdleHandler {
     _active: boolean = true;
     map: any;
 	dimId: string = app.idleHandlerId;
-	_visibleTileRefreshTimers: number[] = [];
+	_visibleTileRefreshTimer: number = null;
+	_lastVisibleTileRefresh: number = 0;
+	_visibleTilesReady: boolean = false;
 
 	getIdleMessage(): string {
 		if (this.map['wopi'] && this.map['wopi'].DisableInactiveMessages) {
@@ -244,23 +246,49 @@ class IdleHandler {
 		}
 	}
 
+	onVisibilityChange() {
+		if (document.hidden) {
+			window.clearTimeout(this._visibleTileRefreshTimer);
+			this._visibleTileRefreshTimer = null;
+			this._lastVisibleTileRefresh = 0;
+		} else {
+			this.refreshVisibleTilesAfterActivation('visibilitychange');
+		}
+	}
+
 	refreshVisibleTilesAfterActivation(reason: string) {
 		if (document.hidden || !app.map?._docLoaded) {
 			return;
 		}
 
+		const wasActive = this._active;
 		this.notifyActive();
-		if (app.socket?.connected?.()) {
+		if (!this._active || !app.socket?.connected?.()) {
+			return;
+		}
+
+		// Let the initial viewport's existing requests finish. Prefetch tiles can wait.
+		if (!this._visibleTilesReady && !cool.VectorRenderingConfig.isEnabled()) {
+			const visibleTiles = Array.from(RenderManager.getTiles().values()).filter(
+				(tile) => tile.distanceFromView === 0);
+			if (!visibleTiles.length || visibleTiles.some((tile) => !tile.hasContent())) {
+				return;
+			}
+			this._visibleTilesReady = true;
+		}
+
+		// A single tab return produces several focus, pageshow and resize events.
+		const now = Date.now();
+		if (this._visibleTileRefreshTimer !== null || now - this._lastVisibleTileRefresh < 1000) {
+			return;
+		}
+		this._lastVisibleTileRefresh = now;
+		if (wasActive) {
 			app.socket.sendMessage('useractive');
 		}
-		this._active = true;
 
-		for (const timer of this._visibleTileRefreshTimers) {
-			window.clearTimeout(timer);
-		}
-		this._visibleTileRefreshTimers = [];
-
-		const refreshTiles = () => {
+		this._visibleTileRefreshTimer = window.setTimeout(() => {
+			this._visibleTileRefreshTimer = null;
 			if (document.hidden || !app.map?._docLoaded) {
 				return;
 			}
@@ -274,11 +302,7 @@ class IdleHandler {
 				docLayer._requestNewTiles();
 				RenderManager.resetPreFetching(true);
 			}
-		};
-
-		for (const delay of [0, 250, 1000]) {
-			this._visibleTileRefreshTimers.push(window.setTimeout(refreshTiles, delay));
-		}
+		}, 0);
 	}
 
 	_sendInactiveMessage() {
@@ -327,9 +351,7 @@ class IdleHandler {
 app.idleHandler = new IdleHandler();
 
 document.addEventListener('visibilitychange', () => {
-	if (!document.hidden) {
-		app.idleHandler.refreshVisibleTilesAfterActivation('visibilitychange');
-	}
+	app.idleHandler.onVisibilityChange();
 });
 
 window.addEventListener('focus', () => {

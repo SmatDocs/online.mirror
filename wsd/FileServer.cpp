@@ -3378,7 +3378,9 @@ void FileServerRequestHandler::updateThemeResources(std::string& fileContent,
         }
     }
 
-    if (brandCSS.empty())
+    const std::string brandingPath = COOLWSD::FileServerRoot + "/browser/dist/" + themePrefix +
+                                     std::string(BRANDING);
+    if (brandCSS.empty() && FileUtil::Stat(brandingPath + ".css").exists())
     {
         std::ostringstream ossBrandCSS;
         ossBrandCSS << R"(<link rel="stylesheet" href=")" << responseRoot << "/browser/"
@@ -3386,7 +3388,7 @@ void FileServerRequestHandler::updateThemeResources(std::string& fileContent,
         brandCSS = ossBrandCSS.str();
     }
 
-    if (brandJS.empty())
+    if (brandJS.empty() && FileUtil::Stat(brandingPath + ".js").exists())
     {
         std::ostringstream ossBrandJS;
         ossBrandJS << "<script src=\"" << responseRoot << "/browser/" << COOLWSD_VERSION_HASH << "/"
