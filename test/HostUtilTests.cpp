@@ -14,7 +14,9 @@
 #include <HostUtil.hpp>
 
 #include <common/ConfigUtil.hpp>
+#include <test/SavedEnvironmentVariable.hpp>
 #include <test/lokassert.hpp>
+#include <wsd/COOLWSD.hpp>
 
 #include <Poco/URI.h>
 #include <Poco/Util/LayeredConfiguration.h>
@@ -40,6 +42,7 @@ class HostUtilTests : public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST(testAliasGroupExtraHosts);
     CPPUNIT_TEST(testEveryAllowedKitHostIsAccepted);
     CPPUNIT_TEST(testGroupsModeWithoutGroupIsReported);
+    CPPUNIT_TEST(testKitHostListHasNoPostAllowHost);
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -53,6 +56,7 @@ class HostUtilTests : public CPPUNIT_NS::TestFixture
     void testAliasGroupExtraHosts();
     void testEveryAllowedKitHostIsAccepted();
     void testGroupsModeWithoutGroupIsReported();
+    void testKitHostListHasNoPostAllowHost();
 
 public:
     /// Clear the parsed host state, matching the empty state it starts with, and
@@ -402,8 +406,7 @@ void HostUtilTests::testEveryAllowedKitHostIsAccepted()
 {
     constexpr std::string_view testname = __func__;
 
-    const char* previous = std::getenv("KIT_HOST_ALLOWLIST");
-    const std::string saved = previous ? previous : std::string();
+    const SavedEnvironmentVariable allowlist("KIT_HOST_ALLOWLIST");
 
     ::setenv("KIT_HOST_ALLOWLIST", "192.168.0.0/16\n127.0.0.1/32\n::1/128\nlocalhost", 1);
 
@@ -424,11 +427,6 @@ void HostUtilTests::testEveryAllowedKitHostIsAccepted()
     // No list at all allows every host.
     ::unsetenv("KIT_HOST_ALLOWLIST");
     LOK_ASSERT(!HostUtil::isForbiddenKitHost("example.com"));
-
-    if (previous)
-        ::setenv("KIT_HOST_ALLOWLIST", saved.c_str(), 1);
-    else
-        ::unsetenv("KIT_HOST_ALLOWLIST");
 }
 
 /// Groups mode with no group refuses every WOPI host, and that is reported. A group, or first mode,
@@ -474,6 +472,38 @@ void HostUtilTests::testGroupsModeWithoutGroupIsReported()
     HostUtil::parseAliases(*layered);
     LOK_ASSERT_MESSAGE("first mode with no group is not reported",
                        !HostUtil::isGroupsModeWithoutGroup());
+}
+
+/// The kit may fetch from the net.lok_allow hosts and the allowed WOPI hosts, but not from the
+/// clients that net.post_allow lets call convert-to, even with an allow attribute on post_allow.
+void HostUtilTests::testKitHostListHasNoPostAllowHost()
+{
+    constexpr std::string_view testname = __func__;
+
+    const SavedEnvironmentVariable allowlist("KIT_HOST_ALLOWLIST");
+    const SavedEnvironmentVariable exemptVerifyHost("KIT_HOST_ALLOWLIST_EXEMPT_VERIFY_HOST");
+    const SavedEnvironmentVariable extRefPaths("KIT_ALLOWED_EXTREF_PATHS");
+
+    Poco::AutoPtr<Poco::Util::MapConfiguration> map(new Poco::Util::MapConfiguration);
+    map->setString("net.lok_allow.host", "data.example");
+    map->setString("net.post_allow[@allow]", "true");
+    map->setString("net.post_allow.host", "10.0.0.0/8");
+    map->setString("net.post_allow.host[1]", "client.example");
+    map->setString("storage.wopi[@allow]", "true");
+    map->setString("storage.wopi.alias_groups.group[0].host", "https://wopi.example:443");
+    map->setString("storage.wopi.alias_groups.group[0].host[@allow]", "true");
+    map->setString("storage.wopi.alias_groups.group[0].alias[0]", "https://alias.example:443");
+
+    Poco::AutoPtr<Poco::Util::LayeredConfiguration> config(new Poco::Util::LayeredConfiguration);
+    config->add(map);
+    COOLWSD::setLokitEnvironmentVariables(*config);
+
+    LOK_ASSERT(!HostUtil::isForbiddenKitHost("data.example"));
+    LOK_ASSERT(!HostUtil::isForbiddenKitHost("wopi.example"));
+    LOK_ASSERT(!HostUtil::isForbiddenKitHost("alias.example"));
+
+    LOK_ASSERT(HostUtil::isForbiddenKitHost("10.1.2.3"));
+    LOK_ASSERT(HostUtil::isForbiddenKitHost("client.example"));
 }
 
 CPPUNIT_TEST_SUITE_REGISTRATION(HostUtilTests);

@@ -39,6 +39,7 @@ public:
     void testHostNetworksOnly();
     void testHostNetworksInvalid();
     void testUrl();
+    void testDocumentHost();
 
     CPPUNIT_TEST_SUITE(TestHostFilter);
     CPPUNIT_TEST(testHostAllowlistStates);
@@ -55,6 +56,7 @@ public:
     CPPUNIT_TEST(testHostNetworksOnly);
     CPPUNIT_TEST(testHostNetworksInvalid);
     CPPUNIT_TEST(testUrl);
+    CPPUNIT_TEST(testDocumentHost);
     CPPUNIT_TEST_SUITE_END();
 };
 
@@ -285,6 +287,45 @@ void TestHostFilter::testUrl()
     CPPUNIT_ASSERT(HostFilter::isUrlForbidden(u"https://evil.example/doc.ods"_ustr));
     HostFilter::setAllowedHosts(nullptr);
     HostFilter::resetAllowedExtRefPaths();
+}
+
+void TestHostFilter::testDocumentHost()
+{
+    // The host the document came from is allowed, along with the list.
+    HostFilter::setAllowedHosts("data\\.example");
+    HostFilter::setDocumentHost(u"wopi.example"_ustr);
+    CPPUNIT_ASSERT(!HostFilter::isForbidden(u"wopi.example"_ustr));
+    CPPUNIT_ASSERT(!HostFilter::isForbidden(u"WOPI.Example"_ustr));
+    CPPUNIT_ASSERT(!HostFilter::isForbidden(u"data.example"_ustr));
+    CPPUNIT_ASSERT(HostFilter::isForbidden(u"other.example"_ustr));
+    CPPUNIT_ASSERT(HostFilter::isForbidden(u"wopi.example.other"_ustr));
+    CPPUNIT_ASSERT(!HostFilter::isUrlForbidden(u"https://wopi.example/image.png"_ustr));
+    CPPUNIT_ASSERT(HostFilter::isUrlForbidden(u"https://other.example/image.png"_ustr));
+
+    // An empty list allows only the host the document came from.
+    HostFilter::setAllowedHosts("");
+    CPPUNIT_ASSERT(!HostFilter::isForbidden(u"wopi.example"_ustr));
+    CPPUNIT_ASSERT(HostFilter::isForbidden(u"data.example"_ustr));
+
+    // With no list, every host stays allowed.
+    HostFilter::setAllowedHosts(nullptr);
+    CPPUNIT_ASSERT(!HostFilter::isForbidden(u"other.example"_ustr));
+
+    // An IPv6 document host is allowed in the bracketed form a URL gives it, and in any
+    // spelling of the same address.
+    HostFilter::setAllowedHosts("");
+    HostFilter::setDocumentHost(u"fd00::5"_ustr);
+    CPPUNIT_ASSERT(!HostFilter::isForbidden(u"[fd00::5]"_ustr));
+    CPPUNIT_ASSERT(!HostFilter::isForbidden(u"[FD00:0::5]"_ustr));
+    CPPUNIT_ASSERT(HostFilter::isForbidden(u"[fd00::6]"_ustr));
+    CPPUNIT_ASSERT(!HostFilter::isUrlForbidden(u"https://[fd00::5]/image.png"_ustr));
+    CPPUNIT_ASSERT(HostFilter::isUrlForbidden(u"https://[fd00::6]/image.png"_ustr));
+
+    HostFilter::setDocumentHost(OUString());
+    HostFilter::setAllowedHosts("");
+    CPPUNIT_ASSERT(HostFilter::isForbidden(u"wopi.example"_ustr));
+
+    HostFilter::setAllowedHosts(nullptr);
 }
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestHostFilter);

@@ -109,6 +109,7 @@ bool prefixEqual(const unsigned char* pA, const unsigned char* pB, int nPrefixLe
 static std::regex g_AllowedHostsRegex("");
 static std::vector<IpNetwork> g_AllowedNetworks;
 static OUString g_ExceptVerifyHost;
+static OUString g_DocumentHost;
 static bool g_AllowedHostsSet = false;
 static bool g_AllowlistConfigured = false;
 static bool g_AllowedHostsExemptVerifyHost = false;
@@ -165,6 +166,8 @@ void HostFilter::setAllowedHostsExemptVerifyHost(bool allowedHostsExemptVerifyHo
     g_AllowedHostsExemptVerifyHost = allowedHostsExemptVerifyHost;
 }
 
+void HostFilter::setDocumentHost(const OUString& rDocumentHost) { g_DocumentHost = rDocumentHost; }
+
 static bool isAllowedHost(const OString& rHost)
 {
     if (g_AllowedHostsSet && std::regex_match(rHost.getStr(), g_AllowedHostsRegex))
@@ -187,9 +190,34 @@ static bool isAllowedHost(const OString& rHost)
     return false;
 }
 
+// An IP address host matches by value, so "[fd00::5]" from a URL matches "fd00::5".
+static bool isDocumentHost(const OUString& rHost)
+{
+    if (g_DocumentHost.isEmpty())
+        return false;
+
+    if (rHost.equalsIgnoreAsciiCase(g_DocumentHost))
+        return true;
+
+    const OString aHost = rHost.toUtf8();
+    const OString aDocumentHost = g_DocumentHost.toUtf8();
+    unsigned char aHostBytes[16];
+    unsigned char aDocumentHostBytes[16];
+    const int nLength
+        = parseAddress(std::string_view(aHost.getStr(), aHost.getLength()), aHostBytes);
+    return nLength != 0
+           && parseAddress(std::string_view(aDocumentHost.getStr(), aDocumentHost.getLength()),
+                           aDocumentHostBytes)
+                  == nLength
+           && std::memcmp(aHostBytes, aDocumentHostBytes, nLength) == 0;
+}
+
 bool HostFilter::isForbidden(const OUString& rHost)
 {
     if (!g_AllowlistConfigured)
+        return false;
+
+    if (isDocumentHost(rHost))
         return false;
 
     return !isAllowedHost(rHost.toUtf8());

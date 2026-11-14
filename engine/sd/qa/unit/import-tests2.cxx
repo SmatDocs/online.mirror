@@ -3343,6 +3343,63 @@ CPPUNIT_TEST_FIXTURE(SdImportTest2, testOwnLuminanceReplacesTheInheritedOne)
     CPPUNIT_ASSERT_EQUAL(Color(0x808080), nCharColor);
 }
 
+CPPUNIT_TEST_FIXTURE(SdImportTest2, testSlideDatePlainTextIsFixedDate)
+{
+    createSdImpressDoc("pptx/slide-date-plain-text.pptx");
+
+    // The date placeholder of the slide holds plain text, which is the fixed date of the slide,
+    // so the Header and Footer dialog edits it and the slide keeps no shape of its own.
+    uno::Reference<drawing::XDrawPage> xPage(getPage(0));
+    uno::Reference<beans::XPropertySet> xPageProperties(xPage, uno::UNO_QUERY_THROW);
+    CPPUNIT_ASSERT_EQUAL(
+        true, xPageProperties->getPropertyValue(u"IsDateTimeVisible"_ustr).get<bool>());
+    CPPUNIT_ASSERT_EQUAL(true,
+                         xPageProperties->getPropertyValue(u"IsDateTimeFixed"_ustr).get<bool>());
+    CPPUNIT_ASSERT_EQUAL(u"Project title | 20.08.2019"_ustr,
+                         xPageProperties->getPropertyValue(u"DateTimeText"_ustr).get<OUString>());
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(0), xPage->getCount());
+}
+
+CPPUNIT_TEST_FIXTURE(SdImportTest2, testSlideFooterInSeveralRunsIsFooterText)
+{
+    createSdImpressDoc("pptx/slide-footer-split-runs.pptx");
+
+    // The footer placeholder of the slide holds its text in two runs that look the same, one of
+    // them marked as misspelled, so the text is the footer text of the slide and the slide keeps no
+    // shape of its own.
+    uno::Reference<drawing::XDrawPage> xPage(getPage(0));
+    uno::Reference<beans::XPropertySet> xPageProperties(xPage, uno::UNO_QUERY_THROW);
+    CPPUNIT_ASSERT_EQUAL(true,
+                         xPageProperties->getPropertyValue(u"IsFooterVisible"_ustr).get<bool>());
+    CPPUNIT_ASSERT_EQUAL(u"First name Last name"_ustr,
+                         xPageProperties->getPropertyValue(u"FooterText"_ustr).get<OUString>());
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(0), xPage->getCount());
+}
+
+CPPUNIT_TEST_FIXTURE(SdImportTest2, testSlideFooterAtInheritedPositionIsFooterText)
+{
+    createSdImpressDoc("pptx/slide-footer-own-position.pptx");
+
+    // The footer of the first slide states the position it inherits from the layout, so it is
+    // the footer text of the slide and the slide keeps no shape of its own.
+    uno::Reference<drawing::XDrawPage> xFirstPage(getPage(0));
+    uno::Reference<beans::XPropertySet> xFirstPageProperties(xFirstPage, uno::UNO_QUERY_THROW);
+    CPPUNIT_ASSERT_EQUAL(
+        true, xFirstPageProperties->getPropertyValue(u"IsFooterVisible"_ustr).get<bool>());
+    CPPUNIT_ASSERT_EQUAL(
+        u"Footer at the layout position"_ustr,
+        xFirstPageProperties->getPropertyValue(u"FooterText"_ustr).get<OUString>());
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(0), xFirstPage->getCount());
+
+    // The footer of the second slide is moved to the top, a place the footer text of the slide
+    // cannot reach, so the slide keeps it as a shape of its own.
+    uno::Reference<drawing::XDrawPage> xSecondPage(getPage(1));
+    uno::Reference<beans::XPropertySet> xSecondPageProperties(xSecondPage, uno::UNO_QUERY_THROW);
+    CPPUNIT_ASSERT_EQUAL(
+        false, xSecondPageProperties->getPropertyValue(u"IsFooterVisible"_ustr).get<bool>());
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(1), xSecondPage->getCount());
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
