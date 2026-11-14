@@ -1,0 +1,10 @@
+--- a/editor.html
++++ b/editor.html
+@@ -251,6 +251,7 @@
+       const px = await queue(async () => {
+         if (S.docType === 1) await dcall(D.setClientVisibleArea, tx, ty, tw, th);
+         const buf = W._malloc(pw * ph * 4);
++        HEAPU8.fill(0, buf, buf + pw * ph * 4);
+         try { await dcall(D.paintTile, buf, pw, ph, tx, ty, tw, th); return HEAPU8.slice(buf, buf + pw * ph * 4); }
+         finally { W._free(buf); }
+       });

@@ -1,0 +1,18 @@
+--- a/static/CustomTarget_unoembind.mk
++++ b/static/CustomTarget_unoembind.mk
+@@ -18,11 +18,12 @@
+ $(gb_CustomTarget_workdir)/static/unoembind/bindings_uno.hxx \
+ $(gb_CustomTarget_workdir)/static/unoembind/bindings_uno.js: \
+         $(call gb_Executable_get_target_for_build,embindmaker) $(call gb_UnoApi_get_target,udkapi) \
+-        $(call gb_UnoApi_get_target,offapi)
++        $(call gb_UnoApi_get_target,offapi) $(SRCDIR)/static/CustomTarget_unoembind.mk
+-	$(call gb_Executable_get_command,embindmaker) uno \
++	$(call gb_Executable_get_command,embindmaker) uno \
+         $(gb_CustomTarget_workdir)/static/unoembind/bindings_uno.cxx \
+         $(gb_CustomTarget_workdir)/static/unoembind/bindings_uno.hxx \
+         $(gb_CustomTarget_workdir)/static/unoembind/bindings_uno.js \
+-        +$(call gb_UnoApi_get_target,udkapi) +$(call gb_UnoApi_get_target,offapi)
++        :$(call gb_UnoApi_get_target,udkapi) :$(call gb_UnoApi_get_target,offapi) \
++        +$(WORKDIR)/overten-writer-idl
+
+ # vim: set noet sw=4 ts=4:

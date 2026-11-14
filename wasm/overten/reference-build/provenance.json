@@ -1,0 +1,25 @@
+{
+  "upstream": "https://github.com/eze-paz/libreoffice-wasm",
+  "commit": "ff4178cc8c5e599ffd05eed4d163bfb493a2bcd7",
+  "files": {
+    "autogen.input": "dc5ba53e4b3778978a2921b9069161f7c9eb1ce30da7eba891403f4dddf96892",
+    "lo-source.patch": "3d2745e4abca7e157d65e3ab85a594d6127d00b771d4f4d149c2c8055f4b3848",
+    "pack.sh": "5ec777df21d6be8de19dbf5d2ea07d5f74d9e32e12e5e06d25f72e7884782fbb",
+    "coopwait.cjs": "3f76350697e1d86f9e19a2a08d8afc397bccf30e29c1d8a034bdfc519ad72057",
+    "exportglobals.cjs": "e75d1eb38d0f903de1c0c6d514f668f0b03c60329f93d995eeae073071b0ddb6",
+    "patchglue.cjs": "93a75180d5121cb48d0a6c3cbf7c48320c99d9c9b0c97c47a07476a937ab9e06",
+    "lazydata.cjs": "2c1ef9d88bb18d930c9f8ef57bb2c20fa0159b2b5a2a788146f81e622a0e905d",
+    "patches/lo-flusher.patch": "ea4e3dc631356c7b89148a70bfed6974823040c20b1d79a64fe3c9d914272a57",
+    "patches/lo-sandpie.patch": "c995bbaa1c7180308e5fb3cb8cd8caa2ab4c6d335fa9d72d9affbbbe307279f7",
+    "patches/memory-growth.patch": "3b3224ca02d7c77df0ae505c336a59d587867d934452a9d2d2a0ee400da86ee3",
+    "patches/release-flags.patch": "3597475c8b45a98bb8707f330daa933269c9a4a52de8ec1b9d868762aed91f8c"
+  },
+  "originalUpstreamPatchSha256": {
+    "lo-source.patch": "3d5f0af616d6d1c67107b7fba7205a826197498ed70d3bf146d70b0eca66d4ba",
+    "patches/lo-flusher.patch": "43652a5ac3f3abca8ca1b74a38317c006a7e155523917f43f24fece5dd909c76",
+    "patches/lo-sandpie.patch": "27288fa1e54b4ac6f10a408f5e32237e54a611a681c7c98ef88609e7684180e6",
+    "patches/memory-growth.patch": "5b229d95b5dd2c4e010b8f6abd5a1b2d3d29600558d458bb5422c89949f096ed",
+    "patches/release-flags.patch": "d71dd27d981e438fc3c71cad3d51b8c5a6fba83f5b8b42b7d46a29509a240a5c"
+  },
+  "patchNormalization": "Removed padding from blank context lines and omitted trailing blank context with adjusted hunk lengths; code changes are unchanged."
+}

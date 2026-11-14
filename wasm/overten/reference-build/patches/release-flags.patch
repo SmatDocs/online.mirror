@@ -1,0 +1,10 @@
+--- a/solenv/gbuild/platform/EMSCRIPTEN_INTEL_GCC.mk
++++ b/solenv/gbuild/platform/EMSCRIPTEN_INTEL_GCC.mk
+@@ -56,5 +56,7 @@
+ gb_LinkTarget_CFLAGS += $(gb_EMSCRIPTEN_QTDEFS)
+ gb_LinkTarget_CXXFLAGS += $(gb_EMSCRIPTEN_QTDEFS)
+ endif
++# sandpie: a function-name map next to the glue, for profiling the stripped release build
++gb_EMSCRIPTEN_LDFLAGS += --emit-symbol-map
+ gb_LinkTarget_LDFLAGS += $(gb_EMSCRIPTEN_LDFLAGS) $(gb_EMSCRIPTEN_CPPFLAGS) \
+     $(gb_EMSCRIPTEN_EXCEPT) -sEXPORT_EXCEPTION_HANDLING_HELPERS

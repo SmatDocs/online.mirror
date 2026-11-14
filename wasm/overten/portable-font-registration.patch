@@ -1,0 +1,11 @@
+--- a/desktop/source/lib/init.cxx
++++ b/desktop/source/lib/init.cxx
+@@ -5233,7 +5233,7 @@
+     {
+         updateConfig(OUString(pValue, strlen(pValue), RTL_TEXTENCODING_UTF8));
+     }
+-#ifdef LINUX
++#if defined(LINUX) || defined(EMSCRIPTEN)
+     else if (strcmp(pOption, "addfont") == 0)
+     {
+         SolarMutexGuard aGuard;
