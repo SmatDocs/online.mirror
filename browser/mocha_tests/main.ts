@@ -61,6 +61,7 @@
 /// <reference path="./Util.test.ts" />
 /// <reference path="./ViewLayout.test.ts" />
 /// <reference path="./IdleTileRefresh.test.ts" />
+/// <reference path="./FontCatalogueRequests.test.ts" />
 /// <reference path="./ServerCommand.test.ts" />
 /// <reference path="./SocketReload.test.ts" />
 /// <reference path="./AccessibilityNotice.test.ts" />

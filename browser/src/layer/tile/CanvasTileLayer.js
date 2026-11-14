@@ -290,6 +290,7 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 
 		this._msgQueue = [];
 		this._toolbarCommandValues = {};
+		this._fontListRequestedAt = 0;
 		this._previewInvalidations = [];
 
 		this._editorId = -1;
@@ -626,6 +627,14 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 	_getToolbarCommandsValues: function() {
 		for (var i = 0; i < this._map.unoToolbarCommands.length; i++) {
 			var command = this._map.unoToolbarCommands[i];
+			// Several startup controls ask for the same large font catalogue before
+			// its first response arrives. Share that response; allow later refreshes.
+			if (command === '.uno:CharFontName') {
+				const now = Date.now();
+				if (this._fontListRequestedAt && now - this._fontListRequestedAt < 10000)
+					continue;
+				this._fontListRequestedAt = now;
+			}
 			app.socket.sendMessage('commandvalues command=' + command);
 		}
 	},
@@ -1382,6 +1391,8 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 				this._map._textInput.setA11yHeadings(obj.commandValues);
 		}
 		else if (this._map.unoToolbarCommands.indexOf(obj.commandName) !== -1) {
+			if (obj.commandName === '.uno:CharFontName')
+				this._fontListRequestedAt = 0;
 			this._toolbarCommandValues[obj.commandName] = obj.commandValues;
 			this._map.fire('updatetoolbarcommandvalues', {
 				commandName: obj.commandName,
