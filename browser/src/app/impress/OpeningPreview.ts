@@ -53,6 +53,11 @@ class ImpressOpeningPreview {
 		private readonly _visualsReady: () => void,
 		private readonly _fontWindow: (limit: number) => void,
 	) {
+		if (app.file?.fileBasedView) {
+			this._closed = true;
+			this.stats.closedReason = 'file based view';
+			return;
+		}
 		app.map.on('tilepreview', this._receive);
 		app.map.on('tilepreviewgone', this._gone);
 		app.map.on('officeagentactivity', this._agentActivity);
@@ -63,6 +68,8 @@ class ImpressOpeningPreview {
 	}
 
 	outgoing(message: string): boolean {
+		if (!this._closed && app.file?.fileBasedView)
+			this.discard('file based view');
 		if (this._closed) return true;
 		if (
 			this._priority &&

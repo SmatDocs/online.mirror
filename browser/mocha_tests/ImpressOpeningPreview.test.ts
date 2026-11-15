@@ -243,6 +243,26 @@ describe('Impress opening preview', function () {
 		nodeassert.strictEqual(fontWindows.at(-1), 0);
 	});
 
+	it('keeps the existing resource path in file-based views', function () {
+		const previous = app.file.fileBasedView;
+		try {
+			app.file.fileBasedView = true;
+			nodeassert.strictEqual(preview.outgoing('getpresentationinfo'), true);
+			nodeassert.strictEqual(preview.stats.closedReason, 'file based view');
+			nodeassert.strictEqual(fontWindows.at(-1), Infinity);
+			const fallback = new ImpressOpeningPreview(
+				() => false,
+				() => undefined,
+				() => {},
+				() => {},
+			);
+			nodeassert.strictEqual(fallback.stats.closedReason, 'file based view');
+			nodeassert.strictEqual(fallback.outgoing('getpresentationinfo'), true);
+		} finally {
+			app.file.fileBasedView = previous;
+		}
+	});
+
 	it('bounds deferred reads and releases them after five seconds without retrying', function () {
 		for (let i = 0; i < 32; i++)
 			nodeassert.strictEqual(
