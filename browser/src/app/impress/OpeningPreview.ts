@@ -54,6 +54,7 @@ class ImpressOpeningPreview {
 		private readonly _fontWindow: (limit: number) => void,
 	) {
 		app.map.on('tilepreview', this._receive);
+		app.map.on('tilepreviewgone', this._gone);
 		app.map.on('officeagentactivity', this._agentActivity);
 		if (this._priority) {
 			this._setFontWindow(1);
@@ -121,7 +122,9 @@ class ImpressOpeningPreview {
 			this._selected &&
 			(data.partId === this._selected ||
 				data.partId === this._master(this._selected)) &&
-			(!whole || (previous !== undefined && previous !== version))
+			(this._awaitingModel ||
+				!whole ||
+				(previous !== undefined && previous !== version))
 		) {
 			this._awaitingModel = false;
 			this._invalidate();
@@ -169,13 +172,9 @@ class ImpressOpeningPreview {
 		const part = layer._selectedPart;
 		const entry = app.impress?.partList?.[part];
 		if (!entry || entry.mode !== cool.VectorMode.Slides) return;
-		if (this._selected && this._selected !== entry.part) {
-			this.discard('slide changed');
-			return;
-		}
-		this._selected = entry.part;
+		if (!this._takeSelection(entry.part, entry.mode)) return;
 		if (this._ready(entry.part)) {
-			this.discard('vectors ready');
+			if (!this._agentBusy) this.discard('vectors ready');
 			return;
 		}
 		if (this._current?.generation === this._generation) return;
@@ -242,15 +241,9 @@ class ImpressOpeningPreview {
 		mode: number,
 	): boolean {
 		if (this._closed) return false;
-		if (
-			this._selected &&
-			(partId !== this._selected || mode !== cool.VectorMode.Slides)
-		) {
-			this.discard('slide changed');
-			return false;
-		}
+		if (!this._takeSelection(partId, mode)) return false;
 		if (this._selected && this._ready(this._selected)) {
-			this.discard('vectors ready');
+			if (!this._agentBusy) this.discard('vectors ready');
 			return false;
 		}
 		this._schedule();
@@ -285,6 +278,35 @@ class ImpressOpeningPreview {
 		return true;
 	}
 	private _lastPaintGeneration = -1;
+
+	private _takeSelection(
+		partId: cool.VectorPartGuid | undefined,
+		mode: number,
+	): boolean {
+		if (!partId) return false;
+		if (mode !== cool.VectorMode.Slides) {
+			this.discard('mode changed');
+			return false;
+		}
+		if (this._selected && this._selected !== partId) {
+			if (!this._agentBusy) {
+				this.discard('slide changed');
+				return false;
+			}
+			this._invalidate();
+			this._revisions.clear();
+			this._awaitingModel = false;
+		}
+		this._selected = partId;
+		return true;
+	}
+
+	private _gone = (event: { id: string | number }): void => {
+		if (!this._pending || String(event.id) !== this._pending.id) return;
+		window.clearTimeout(this._requestTimer);
+		this._pending = undefined;
+		this._schedule();
+	};
 
 	private _setFontWindow(limit: number): void {
 		this._fontWindow(this._agentBusy && limit !== Infinity ? 0 : limit);
@@ -336,6 +358,7 @@ class ImpressOpeningPreview {
 		this._image = undefined;
 		this._revisions.clear();
 		app.map.off('tilepreview', this._receive);
+		app.map.off('tilepreviewgone', this._gone);
 		app.map.off('officeagentactivity', this._agentActivity);
 	}
 }

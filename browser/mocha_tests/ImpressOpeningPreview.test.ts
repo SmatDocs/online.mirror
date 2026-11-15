@@ -14,6 +14,7 @@ describe('Impress opening preview', function () {
 	let serial: number;
 	let fontWindows: number[];
 	let activity: (event: { busy: boolean }) => void;
+	let gone: (event: { id: string }) => void;
 	const part = {
 		partId: 'S0',
 		mode: 0,
@@ -65,6 +66,7 @@ describe('Impress opening preview', function () {
 			on: (name: string, fn: (event: any) => void) => {
 				if (name === 'tilepreview') received = fn;
 				if (name === 'officeagentactivity') activity = fn;
+				if (name === 'tilepreviewgone') gone = fn;
 			},
 			off: () => {},
 			_docLayer: {
@@ -198,6 +200,47 @@ describe('Impress opening preview', function () {
 		nodeassert.strictEqual(preview.stats.closedReason, 'host activity timeout');
 		nodeassert.strictEqual(fontWindows.at(-1), Infinity);
 		nodeassert(messages.includes('getpresentationinfo'));
+	});
+
+	it('keeps the priority gate for a blank or already drawable document while the agent is busy', function () {
+		activity({ busy: true });
+		loaded = true;
+		draw();
+		nodeassert.strictEqual(preview.stats.closedReason, '');
+		nodeassert.strictEqual(fontWindows.at(-1), 0);
+		loaded = false;
+		preview.localChange();
+		preview.partArrived({ ...part, version: 2 }, true);
+		answer(0, 'old');
+		tick();
+		answer(1, 'agent content');
+		draw();
+		nodeassert.strictEqual(drawn.at(-1), 'agent content');
+		nodeassert.strictEqual(fontWindows.at(-1), 0);
+	});
+	it('keeps edits prioritized when an agent changes the selected slide and retires an old preview', function () {
+		activity({ busy: true });
+		(app as any).impress.partList[0].part = 'S1';
+		preview.draw(
+			{
+				drawImage: (image: any) => drawn.push(image.tag),
+			} as unknown as CanvasRenderingContext2D,
+			'S1',
+			0,
+		);
+		gone({ id: requestIds[0] });
+		tick();
+		answer(1, 'new selected slide');
+		preview.draw(
+			{
+				drawImage: (image: any) => drawn.push(image.tag),
+			} as unknown as CanvasRenderingContext2D,
+			'S1',
+			0,
+		);
+		nodeassert.strictEqual(drawn.at(-1), 'new selected slide');
+		nodeassert.strictEqual(preview.stats.closedReason, '');
+		nodeassert.strictEqual(fontWindows.at(-1), 0);
 	});
 
 	it('bounds deferred reads and releases them after five seconds without retrying', function () {
