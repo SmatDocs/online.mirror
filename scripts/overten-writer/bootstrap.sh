@@ -2,6 +2,9 @@
 # Experimental build container only. Never run on an application host directly.
 set -euo pipefail
 test -f /.dockerenv
+if test -f /work/resume-native; then
+    exec gosu 10001:10001 bash /recipe/resume-native.sh
+fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=60 update
 apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=60 install -y --no-install-recommends \

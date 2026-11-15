@@ -32,7 +32,9 @@ class VectorFontCache {
 			['0', 'anonymous', 'undefined'].includes(user.toLowerCase())
 		)
 			return undefined;
-		const version = location.pathname.match(/^\/browser\/([^/]+)\//)?.[1];
+		const version =
+			app.socket?.WSDServer?.Hash ||
+			location.pathname.match(/^\/browser\/([^/]+)\//)?.[1];
 		return version
 			? 'overten-vector-fonts-v1:' + version + ':' + user
 			: undefined;
@@ -157,8 +159,7 @@ class VectorFontCache {
 				this._bytes.size >= VectorFontCache.maxEntries)
 		) {
 			const oldest = this._bytes.entries().next().value as
-				| [string, ArrayBuffer]
-				| undefined;
+				[string, ArrayBuffer] | undefined;
 			if (!oldest) break;
 			this._total -= oldest[1].byteLength;
 			this._bytes.delete(oldest[0]);

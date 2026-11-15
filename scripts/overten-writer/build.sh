@@ -36,8 +36,8 @@ cd /work/source
 make -j4
 printf 'online-built=%s\n' "$(date -u +%FT%TZ)" >> /work/build-status.txt
 du -sh /work/source/engine/instdir /work/source/engine/workdir /work/tarballs /work/ccache > /work/footprint.txt
-tar -czf /work/artifacts/writer-native.tar.gz \
-    engine/instdir coolwsd coolforkit-ns coolforkit-caps browser/dist \
-    coolwsd.xml config.h
+tar --dereference -czf /work/artifacts/writer-native.tar.gz \
+    engine/instdir coolwsd coolforkit-ns coolforkit-caps coolmount browser/dist \
+    discovery.xml coolwsd.xml config.h
 cd /work/artifacts
 sha256sum writer-native.tar.gz > SHA256SUMS
