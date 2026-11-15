@@ -4,6 +4,13 @@ This recipe builds an **experimental Writer-only headless reference**, not the
 production Collabora revision. It retains JS UNO and the exact reference
 patches so results can be compared with the three-application headless trial.
 
+**Result, 2026-11-15: rejected for product use.** The build and Word text/plan
+checks passed, but real equations disappear on import and are lost on DOCX
+export. Image/chart/table checks passed. The grouped Math strip flag must be
+addressed before accepting this profile. A fresh comparison measured little
+startup change (9.20 vs 9.01 s), about 67 MiB less small-Word browser PSS, and a
+14.3% smaller complete compressed runtime. This is a recorded experiment.
+
 - Core: `7528c0d406012e10c6ce34c3f24bf277302ec695`.
 - Wrapper/patch source: `eze-paz/libreoffice-wasm`, commit
   `ff4178cc8c5e599ffd05eed4d163bfb493a2bcd7`.
