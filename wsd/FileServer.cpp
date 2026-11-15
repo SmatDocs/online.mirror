@@ -1684,9 +1684,9 @@ FileServerRequestHandler::ResourceAccessDetails FileServerRequestHandler::prepro
     else
         Poco::replaceInPlace(preprocess, std::string("%BROWSER_LOGGING%"), std::string());
 
-    const unsigned int outOfFocusTimeoutSecs = config.getUInt("per_view.out_of_focus_timeout_secs", 300);
+    const unsigned int outOfFocusTimeoutSecs = config.getUInt("per_view.out_of_focus_timeout_secs", 3600);
     Poco::replaceInPlace(preprocess, std::string("%OUT_OF_FOCUS_TIMEOUT_SECS%"), std::to_string(outOfFocusTimeoutSecs));
-    const unsigned int idleTimeoutSecs = config.getUInt("per_view.idle_timeout_secs", 900);
+    const unsigned int idleTimeoutSecs = config.getUInt("per_view.idle_timeout_secs", 3600);
     Poco::replaceInPlace(preprocess, std::string("%IDLE_TIMEOUT_SECS%"), std::to_string(idleTimeoutSecs));
     const unsigned int minSavedMessTimeoutSecs = config.getUInt("per_view.min_saved_message_timeout_secs", 0);
     Poco::replaceInPlace(preprocess, std::string("%MIN_SAVED_MESSAGE_TIMEOUT_SECS%"), std::to_string(minSavedMessTimeoutSecs));
@@ -3382,7 +3382,9 @@ void FileServerRequestHandler::updateThemeResources(std::string& fileContent,
         }
     }
 
-    if (brandCSS.empty())
+    const std::string brandingPath = COOLWSD::FileServerRoot + "/browser/dist/" + themePrefix +
+                                     std::string(BRANDING);
+    if (brandCSS.empty() && FileUtil::Stat(brandingPath + ".css").exists())
     {
         std::ostringstream ossBrandCSS;
         ossBrandCSS << R"(<link rel="stylesheet" href=")" << responseRoot << "/browser/"
@@ -3390,7 +3392,7 @@ void FileServerRequestHandler::updateThemeResources(std::string& fileContent,
         brandCSS = ossBrandCSS.str();
     }
 
-    if (brandJS.empty())
+    if (brandJS.empty() && FileUtil::Stat(brandingPath + ".js").exists())
     {
         std::ostringstream ossBrandJS;
         ossBrandJS << "<script src=\"" << responseRoot << "/browser/" << COOLWSD_VERSION_HASH << "/"

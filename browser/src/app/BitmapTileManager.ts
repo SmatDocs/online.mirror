@@ -518,6 +518,14 @@ class BitmapTileManager extends RenderManagerBase {
 		} else return false;
 	}
 
+	private isInteractionSensitivePhase(): boolean {
+		return (
+			!!app.sectionContainer &&
+			typeof app.sectionContainer.isDraggingSomething === 'function' &&
+			app.sectionContainer.isDraggingSomething()
+		);
+	}
+
 	private getMaxTileCountToPrefetch(tileSize: number): number {
 		const viewTileWidth = Math.floor(
 			(app.sectionContainer.getWidth() + tileSize - 1) / tileSize,
@@ -530,7 +538,7 @@ class BitmapTileManager extends RenderManagerBase {
 		// Read-only views can much more aggressively pre-load
 		return (
 			Math.ceil((viewTileWidth * viewTileHeight) / 4) *
-			(!this._hasEditPerm ? 4 : 1)
+			(!this._hasEditPerm ? 4 : 2)
 		);
 	}
 
@@ -1013,6 +1021,10 @@ class BitmapTileManager extends RenderManagerBase {
 		this._adjacentTilePreFetcher = setTimeout(() => {
 			this._adjacentTilePreFetcher = undefined;
 
+			// While the user drags something in edit mode, keep the socket free for the
+			// interaction itself instead of fetching tiles ahead.
+			if (app.map.isEditMode() && this.isInteractionSensitivePhase()) return;
+
 			// The view may have moved on since the timer was set, so read where it is now.
 			this.updateProperties();
 			const direction = app.activeDocument.activeLayout.getLastPanDirection();
@@ -1097,6 +1109,7 @@ class BitmapTileManager extends RenderManagerBase {
 
 	private sendTileCombineRequest(tileCombineQueue: Array<TileCoordData>) {
 		if (tileCombineQueue.length <= 0) return;
+		const interactionSensitive = this.isInteractionSensitivePhase();
 
 		// Sort into buckets of consistent part & mode. The key is a string:
 		// part identifiers can be page GUIDs, which do not fit into
@@ -1162,7 +1175,7 @@ class BitmapTileManager extends RenderManagerBase {
 			);
 
 			// When Writer requests mode=2, also request mode=1.
-			if (app.map._docLayer.isWriter() && mode === 2) {
+			if (app.map._docLayer.isWriter() && mode === 2 && !interactionSensitive) {
 				this.sendTileCombineMessage(
 					part,
 					/*mode=*/ 1,
@@ -1603,8 +1616,20 @@ class BitmapTileManager extends RenderManagerBase {
 
 		const propertiesUpdated = this.updateProperties();
 		const tileSize = this.tileSize;
-		const maxTilesToFetch = this.getMaxTileCountToPrefetch(tileSize);
-		const maxBorderWidth = !this._hasEditPerm ? 40 : 10;
+		const interactionSensitive =
+			this._hasEditPerm && this.isInteractionSensitivePhase();
+		const maxTilesToFetch = Math.max(
+			1,
+			Math.floor(
+				this.getMaxTileCountToPrefetch(tileSize) *
+					(interactionSensitive ? 0.5 : 1),
+			),
+		);
+		const maxBorderWidth = !this._hasEditPerm
+			? 40
+			: interactionSensitive
+				? 10
+				: 20;
 
 		// FIXME: when we are actually editing we should pre-load much less until we stop
 		/*		if (isActiveEditing()) {

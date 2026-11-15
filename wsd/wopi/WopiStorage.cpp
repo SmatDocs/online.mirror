@@ -129,7 +129,7 @@ private:
 
 void anonymizeAvatarURL(Poco::JSON::Object::Ptr& userExtraInfo)
 {
-    auto avatarURL = userExtraInfo->getValue<std::string>("avatar");
+    auto avatarURL = userExtraInfo->optValue<std::string>("avatar", std::string());
     if (!avatarURL.empty())
     {
         const std::string avatar_path = "/avatar/";

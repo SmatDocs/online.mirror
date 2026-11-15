@@ -480,6 +480,7 @@ COOL_JS_LST =\
 	src/app/RenderManagerBase.ts \
 	src/app/BitmapTileManager.ts \
 	src/app/VectorResourceTracker.ts \
+	src/app/VectorFontCache.ts \
 	src/app/VectorResourceLoader.ts \
 	src/app/VectorManagerBase.ts \
 	src/app/VectorPartManagerBase.ts \
@@ -712,6 +713,7 @@ COOL_JS_LST =\
 	src/canvas/sections/ScrollSection.ts \
 	src/canvas/sections/MouseControl.ts \
 	src/app/LayerUtil.ts \
+	src/map/handler/CallPythonScriptBridge.js \
 	src/layer/tile/CanvasTileLayer.js \
 	src/layer/vector/CDarkOverlay.ts \
 	src/layer/SplitPanesContext.ts \

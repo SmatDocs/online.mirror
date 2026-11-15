@@ -143,7 +143,6 @@ class Menubar extends window.L.Control {
 				{name: _UNO('.uno:SetDocumentProperties', 'text'), uno: '.uno:SetDocumentProperties', id: 'properties'},
 				{name: _UNO('.uno:SecurityLabel', 'text'), uno: '.uno:SecurityLabel', id: 'securitylabel'},
 				{name: _UNO('.uno:Signature', 'text'), uno: '.uno:Signature', id: 'signature'},
-				{name: _('Options'), id: 'settings-dialog', type: 'action', mobileapp: false},
 				{type: 'separator'},
 				{name: _UNO('.uno:Print', 'text'), unoid: '.uno:Print', id: 'print', type: 'action'},
 				{name: _('Close document'), id: 'closedocument', type: 'action'}
@@ -247,7 +246,6 @@ class Menubar extends window.L.Control {
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), unoid: '.uno:HyperlinkDialog', id: 'inserthyperlink', type: 'action'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
-				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{type: 'separator'},
 				{uno: '.uno:InsertQrCode'},
 				{uno: '.uno:InsertSymbol'},
@@ -457,7 +455,6 @@ class Menubar extends window.L.Control {
 			{name: _('Extensions'), id: 'extensions-menu', type: 'menu', menu: []},
 			{name: _UNO('.uno:HelpMenu', 'text'), id: 'help', type: 'menu', accessibility: {combination: 'MY'}, menu: [
 				{name: _('Online Help'), id: 'online-help', type: 'action', iosapp: false},
-				{name: _('Show Tour'), id: 'onboardingtour', type: 'action'},
 				{type: 'separator', iosapp: false},
 				{name: _('Keyboard shortcuts'), id: 'keyboard-shortcuts', type: 'action', iosapp: false},
 				{type: 'separator'},
@@ -490,7 +487,6 @@ class Menubar extends window.L.Control {
 				{name: _UNO('.uno:SetDocumentProperties', 'presentation'), uno: '.uno:SetDocumentProperties', id: 'properties'},
 				{name: _UNO('.uno:SecurityLabel', 'presentation'), uno: '.uno:SecurityLabel', id: 'securitylabel'},
 				{name: _UNO('.uno:Signature', 'presentation'), uno: '.uno:Signature', id: 'signature'},
-				{name: _('Options'), id: 'settings-dialog', type: 'action', mobileapp: false},
 				{type: 'separator'},
 				{name: _UNO('.uno:Print', 'presentation'), id: 'print', type: 'menu', menu: [
 					{name: _('Full Page Slides'), id: 'print', type: 'action'},
@@ -563,7 +559,6 @@ class Menubar extends window.L.Control {
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), unoid: '.uno:HyperlinkDialog', id: 'inserthyperlink', type: 'action'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
-				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{type: 'separator'},
 				{uno: '.uno:InsertSymbol'},
 				{type: 'separator'},
@@ -677,7 +672,6 @@ class Menubar extends window.L.Control {
 			{name: _('Extensions'), id: 'extensions-menu', type: 'menu', menu: []},
 			{name: _UNO('.uno:HelpMenu', 'presentation'), id: 'help', type: 'menu', accessibility: {combination: 'MY'}, menu: [
 				{name: _('Online Help'), id: 'online-help', type: 'action', iosapp: false},
-				{name: _('Show Tour'), id: 'onboardingtour', type: 'action'},
 				{type: 'separator', iosapp: false},
 				{name: _('Keyboard shortcuts'), id: 'keyboard-shortcuts', type: 'action', iosapp: false},
 				{type: 'separator'},
@@ -706,7 +700,6 @@ class Menubar extends window.L.Control {
 				{name: !window.ThisIsAMobileApp ? _('Download as') : _('Export as'), id: 'downloadas', type: 'menu', menu: downloadAsMenu('drawing')},
 				{name: _UNO('.uno:SetDocumentProperties', 'presentation'), uno: '.uno:SetDocumentProperties', id: 'properties'},
 				{name: _UNO('.uno:Signature', 'presentation'), uno: '.uno:Signature', id: 'signature'},
-				{name: _('Options'), id: 'settings-dialog', type: 'action', mobileapp: false},
 				{type: 'separator'},
 				{name: _('Close document'), id: 'closedocument', type: 'action'}
 			]},
@@ -757,7 +750,6 @@ class Menubar extends window.L.Control {
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), unoid: '.uno:HyperlinkDialog', id: 'inserthyperlink', type: 'action'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
-				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{type: 'separator'},
 				{uno: '.uno:InsertSymbol'},
 				{type: 'separator'},
@@ -850,7 +842,6 @@ class Menubar extends window.L.Control {
 			{name: _('Extensions'), id: 'extensions-menu', type: 'menu', menu: []},
 			{name: _UNO('.uno:HelpMenu', 'presentation'), id: 'help', type: 'menu', accessibility: {combination: 'MY'}, menu: [
 				{name: _('Online Help'), id: 'online-help', type: 'action', iosapp: false},
-				{name: _('Show Tour'), id: 'onboardingtour', type: 'action'},
 				{type: 'separator', iosapp: false},
 				{name: _('Keyboard shortcuts'), id: 'keyboard-shortcuts', type: 'action', iosapp: false},
 				{type: 'separator'},
@@ -882,7 +873,6 @@ class Menubar extends window.L.Control {
 				{name: _UNO('.uno:SetDocumentProperties', 'spreadsheet'), uno: '.uno:SetDocumentProperties', id: 'properties'},
 				{name: _UNO('.uno:SecurityLabel', 'spreadsheet'), uno: '.uno:SecurityLabel', id: 'securitylabel'},
 				{name: _UNO('.uno:Signature', 'spreadsheet'), uno: '.uno:Signature', id: 'signature'},
-				{name: _('Options'), id: 'settings-dialog', type: 'action', mobileapp: false},
 				{type: 'separator'},
 				{name: _UNO('.uno:Print', 'spreadsheet'), id: 'print', type: 'menu', menu: [
 					{name: _('Active sheet'), id: 'print-active-sheet', type: 'action'},
@@ -967,7 +957,6 @@ class Menubar extends window.L.Control {
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), uno: '.uno:HyperlinkDialog'},
 				{name: _('Smart Picker'), id: 'remotelink', type: 'action'},
-				{name: _('AI Assistant'), id: 'remoteaicontent', type: 'action'},
 				{uno: '.uno:InsertSymbol'},
 				{type: 'separator'},
 				{name: _UNO('.uno:InsertField', 'text'), type: 'menu', menu: [
@@ -1178,7 +1167,6 @@ class Menubar extends window.L.Control {
 			{name: _('Extensions'), id: 'extensions-menu', type: 'menu', menu: []},
 			{name: _UNO('.uno:HelpMenu', 'spreadsheet'), id: 'help', type: 'menu', accessibility: {combination: 'MY'}, menu: [
 				{name: _('Online Help'), id: 'online-help', type: 'action', iosapp: false},
-				{name: _('Show Tour'), id: 'onboardingtour', type: 'action'},
 				{type: 'separator', iosapp: false},
 				{name: _('Keyboard shortcuts'), id: 'keyboard-shortcuts', type: 'action', iosapp: false},
 				{type: 'separator'},

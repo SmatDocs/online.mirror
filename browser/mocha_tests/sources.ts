@@ -284,6 +284,7 @@
 /// <reference path="../src/canvas/sections/InteractionModeSection.ts" />
 /// <reference path="../src/canvas/sections/ZoomControl.ts" />
 /// <reference path="../src/app/LayerUtil.ts" />
+/// <reference path="../src/map/handler/CallPythonScriptBridge.js" />
 /// <reference path="../src/layer/vector/CDarkOverlay.ts" />
 /// <reference path="../src/layer/SplitPanesContext.ts" />
 /// <reference path="../src/layer/CalcSplitPanesContext.ts" />

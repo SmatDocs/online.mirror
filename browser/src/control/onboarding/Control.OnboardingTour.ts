@@ -18,6 +18,9 @@
  * user can start it again at any time.
  */
 
+// Overten: the screen tour never opens on its own.
+const OVERTEN_AUTO_START_TOUR: boolean = false;
+
 class OnboardingTourController {
 	// The modal ids of the cards of even and odd steps: the focus moves from card to card.
 	private static readonly modalIds = [
@@ -156,6 +159,10 @@ class OnboardingTourController {
 	}
 
 	private maybeAutoStart(): void {
+		// Overten: the editor is embedded in our app, so its users never get the Collabora
+		// screen tour, on any document type. Show Tour is removed from the menus too.
+		if (!OVERTEN_AUTO_START_TOUR) return;
+
 		// The steps are chosen from what is on screen when the tour starts.
 		if (!this.uiReady || this.isRunning() || this.startTask !== null) return;
 

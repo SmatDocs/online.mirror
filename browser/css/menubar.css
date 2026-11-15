@@ -212,7 +212,9 @@ nav [id^='save'].saved img {
 }
 
 .main-nav.hasnotebookbar:not(.readonly) {
-	background: var(--color-main-background);
+	/* Keep the Overten notebook tab/title strip in the document-type color. */
+	background: rgb(var(--doc-type));
+	color: #fff;
 	padding: 0px;
 	overflow: visible;
 	padding-inline-start: 5px;

@@ -28,9 +28,14 @@ class VectorResourceTracker<K, V> {
 
 	// Builds the outgoing request message for an id.
 	private _requestMessage: (id: K) => string;
+	private _requestCached?: (id: K) => Promise<boolean>;
 
-	constructor(requestMessage: (id: K) => string) {
+	constructor(
+		requestMessage: (id: K) => string,
+		requestCached?: (id: K) => Promise<boolean>,
+	) {
 		this._requestMessage = requestMessage;
+		this._requestCached = requestCached;
 	}
 
 	has(id: K): boolean {
@@ -106,9 +111,17 @@ class VectorResourceTracker<K, V> {
 		for (const id of ids) {
 			if (this._cache.has(id)) continue;
 			if (this._unavailable.has(id)) continue;
-			this._requests.request(id, () =>
-				app.socket.sendMessage(this._requestMessage(id)),
-			);
+			this._requests.request(id, () => {
+				const request = () => {
+					if (this._requests.isOut(id))
+						app.socket.sendMessage(this._requestMessage(id));
+				};
+				if (this._requestCached)
+					void this._requestCached(id).then((hit) => {
+						if (!hit) request();
+					}, request);
+				else request();
+			});
 		}
 	}
 

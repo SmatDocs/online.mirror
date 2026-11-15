@@ -27,7 +27,7 @@
 /// websocket frame and via the iframe's Content-Security-Policy img-src directive.
 class UnitWopiCommentAvatar : public WopiTestServer
 {
-    STATE_ENUM(Phase, CheckCsp, Load, WaitWopiInfo, Done) _phase;
+    STATE_ENUM(Phase, CheckCsp, Load, WaitWopiInfo, WaitDocumentLoaded, Done) _phase;
 
     static constexpr const char* kAvatarUrl = "https://avatars.example.com/test/avatar.png";
 
@@ -42,6 +42,23 @@ public:
     {
         WopiTestServer::configure(config);
         config.setString("comment_avatar", kAvatarUrl);
+        config.setBool("logging.anonymize.anonymize_user_data", true);
+    }
+
+    void configCheckFileInfo(const Poco::Net::HTTPRequest& /*request*/,
+                             Poco::JSON::Object::Ptr& fileInfo) override
+    {
+        // A host can provide profile metadata without an optional avatar. Anonymizing
+        // this valid response must not abort loading with Poco::InvalidAccessException.
+        fileInfo->set("UserExtraInfo", Poco::JSON::Object::Ptr(new Poco::JSON::Object()));
+    }
+
+    bool onDocumentLoaded(const std::string& /*message*/) override
+    {
+        LOK_ASSERT_STATE(_phase, Phase::WaitDocumentLoaded);
+        TRANSITION_STATE(_phase, Phase::Done);
+        passTest("Document loaded with anonymization and an empty optional profile");
+        return true;
     }
 
     bool onFilterSendWebSocketMessage(const std::string_view data, const WSOpCode /*code*/,
@@ -73,8 +90,7 @@ public:
             return false;
         }
 
-        TRANSITION_STATE(_phase, Phase::Done);
-        passTest("comment_avatar reached the client via wopi info and CSP img-src");
+        TRANSITION_STATE(_phase, Phase::WaitDocumentLoaded);
         return false;
     }
 
@@ -99,6 +115,7 @@ public:
                 break;
             }
             case Phase::WaitWopiInfo:
+            case Phase::WaitDocumentLoaded:
             case Phase::Done:
                 break;
         }

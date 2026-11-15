@@ -64,6 +64,8 @@
 /// <reference path="./SheetGeometry.test.ts" />
 /// <reference path="./Util.test.ts" />
 /// <reference path="./ViewLayout.test.ts" />
+/// <reference path="./IdleTileRefresh.test.ts" />
+/// <reference path="./FontCatalogueRequests.test.ts" />
 /// <reference path="./ServerCommand.test.ts" />
 /// <reference path="./SocketReload.test.ts" />
 /// <reference path="./AccessibilityNotice.test.ts" />
@@ -130,4 +132,8 @@
 /// <reference path="./AIChatSidebar.test.ts" />
 /// <reference path="./NotebookbarTabs.test.ts" />
 /// <reference path="./DocPartChanged.test.ts" />
+/// <reference path="./CallPythonScriptBridge.test.ts" />
+/// <reference path="./SidebarVisibility.test.ts" />
+/// <reference path="./InitialLoadingScreen.test.ts" />
+/// <reference path="./RenameInteraction.test.ts" />
 // NOTE: reference new tests here ...

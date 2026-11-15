@@ -71,6 +71,7 @@ PPTShape::PPTShape( const oox::ppt::ShapeLocation eShapeLocation, const OUString
 , meShapeLocation( eShapeLocation )
 , mbReferenced( false )
 , mbHasNoninheritedShapeProperties( false )
+, mbHasOwnTransform( false )
 {
 }
 
@@ -156,7 +157,24 @@ bool PPTShape::IsPlaceHolderCandidate(const SlidePersist& rSlidePersist) const
     auto rParagraphs = pTextBody->getParagraphs();
     if (rParagraphs.size() != 1)
         return false;
-    if (rParagraphs.front()->getRuns().size() != 1)
+    const auto& rRuns = rParagraphs.front()->getRuns();
+    if (rRuns.empty())
+        return false;
+    // Several runs read as one plain text when each of them is text. The visual property check
+    // below makes sure that they all look the same.
+    if (rRuns.size() > 1
+        && std::any_of(rRuns.begin(), rRuns.end(), [](const oox::drawingml::TextRunPtr& pRun) {
+               return pRun->isLineBreak()
+                      || dynamic_cast<const oox::drawingml::TextField*>(pRun.get()) != nullptr;
+           }))
+        return false;
+    // A position of its own keeps the placeholder on the slide, unless it is the position the
+    // placeholder inherits.
+    if (mbHasOwnTransform
+        && (!mpPlaceholder || getPosition() != mpPlaceholder->getPosition()
+            || getSize() != mpPlaceholder->getSize()
+            || getRotation() != mpPlaceholder->getRotation()
+            || getFlipH() != mpPlaceholder->getFlipH() || getFlipV() != mpPlaceholder->getFlipV()))
         return false;
     // If the placeholder has a shape other than rectangle,
     // we have to place it in the slide as a CustomShape.
@@ -542,7 +560,7 @@ void PPTShape::addShape(
                 case XML_ftr :
                     if (IsPlaceHolderCandidate(rSlidePersist))
                     {
-                        const OUString aFooterText = getTextBody()->toString();
+                        const OUString aFooterText = getTextBody()->firstParatoString();
 
                         if( !aFooterText.isEmpty() )
                         {

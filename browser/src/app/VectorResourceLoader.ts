@@ -17,6 +17,8 @@
  */
 
 class VectorResourceLoader {
+	private _fontBytes = new VectorFontCache();
+	private _generation = 0;
 	/// The decoded images by their checksum.
 	readonly images = new VectorResourceTracker<number, HTMLImageElement>(
 		(checksum) =>
@@ -27,6 +29,12 @@ class VectorResourceLoader {
 	/// The loaded font faces by font id.
 	readonly fonts = new VectorResourceTracker<string, FontFace>(
 		(fontId) => 'commandvalues command=.uno:VectorRenderingFont?id=' + fontId,
+		async (fontId) => {
+			const generation = this._generation;
+			const bytes = await this._fontBytes.get(fontId);
+			if (generation !== this._generation) return true;
+			return bytes ? this._registerFont(fontId, bytes, true) : false;
+		},
 	);
 
 	/// Called with the owners whose content names an image or a font that has just loaded, or
@@ -110,6 +118,8 @@ class VectorResourceLoader {
 
 	/// Drop the images and the fonts, and take the fonts off the document.
 	discard(): void {
+		this._generation++;
+		this._fontBytes.close();
 		for (const face of this.fonts.values())
 			(document as unknown as { fonts: Set<FontFace> }).fonts.delete(face);
 		this.fonts.clear();
@@ -168,17 +178,29 @@ class VectorResourceLoader {
 		const binary = window.atob(values.data);
 		const bytes = new Uint8Array(binary.length);
 		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-		const face = new FontFace('vecfont-' + fontId, bytes.buffer);
-		face
-			.load()
-			.then(() => {
+		void this._registerFont(fontId, bytes.buffer, false);
+	}
+
+	private async _registerFont(
+		fontId: string,
+		bytes: ArrayBuffer,
+		cached: boolean,
+	): Promise<boolean> {
+		const generation = this._generation;
+		try {
+			const face = await new FontFace('vecfont-' + fontId, bytes).load();
+			if (generation === this._generation) {
 				(document as unknown as { fonts: Set<FontFace> }).fonts.add(face);
 				this.fonts.setLoaded(fontId, face);
+				this._fontBytes.put(fontId, bytes);
 				this._loaded(this.fonts.partsFor(fontId));
-			})
-			.catch(() => {
+			}
+			return true;
+		} catch {
+			if (!cached && generation === this._generation)
 				this.fonts.setUnavailable(fontId);
-			});
+			return false;
+		}
 	}
 
 	/// Record a checksum no usable image could be obtained for, and log the reason.
