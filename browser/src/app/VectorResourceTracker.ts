@@ -16,7 +16,9 @@
 class VectorResourceTracker<K, V> {
 	/// How long a request waits for its answer, in milliseconds. After that the id is asked for
 	/// again while a part uses it.
-	private static readonly requestTimeout = 10000;
+	private static readonly requestTimeout = 60000;
+	private static readonly maxAttempts = 2;
+	private _attempts = new Map<K, number>();
 
 	private _cache: Map<K, V> = new Map();
 	private _requests = new cool.RequestTracker<K>({
@@ -113,8 +115,10 @@ class VectorResourceTracker<K, V> {
 			if (this._unavailable.has(id)) continue;
 			this._requests.request(id, () => {
 				const request = () => {
-					if (this._requests.isOut(id))
+					if (this._requests.isOut(id)) {
+						this._attempts.set(id, (this._attempts.get(id) ?? 0) + 1);
 						app.socket.sendMessage(this._requestMessage(id));
+					}
 				};
 				if (this._requestCached)
 					void this._requestCached(id).then((hit) => {
@@ -125,16 +129,28 @@ class VectorResourceTracker<K, V> {
 		}
 	}
 
-	// The requests got no answer in time. Their ids that a part still uses are asked for again.
+	// A slow ordered socket can still be transferring a font after ten seconds.
+	// Allow one minute before a single retry, then stop instead of adding the
+	// same large payload to that socket indefinitely.
 	private _requestAgain(requests: cool.RequestOut<K, undefined>[]): void {
 		const ids = new Set<K>();
-		for (const request of requests)
-			for (const id of request.keys) if (this._idToParts.has(id)) ids.add(id);
+		for (const request of requests) {
+			for (const id of request.keys) {
+				if (!this._idToParts.has(id)) this._attempts.delete(id);
+				else if (
+					(this._attempts.get(id) ?? 0) >= VectorResourceTracker.maxAttempts
+				)
+					this.setUnavailable(id);
+				else ids.add(id);
+			}
+		}
 		this.requestMissing(ids);
 	}
 
 	/// Store a loaded value, which answers the request for the id.
 	setLoaded(id: K, value: V): void {
+		this._attempts.delete(id);
+		this._unavailable.delete(id);
 		this._cache.set(id, value);
 		this._requests.answered(id);
 	}
@@ -142,6 +158,7 @@ class VectorResourceTracker<K, V> {
 	/// Record an id no usable data could be obtained for, so it is not
 	/// requested again.
 	setUnavailable(id: K): void {
+		this._attempts.delete(id);
 		this._unavailable.add(id);
 		this._requests.answered(id);
 	}
@@ -154,11 +171,13 @@ class VectorResourceTracker<K, V> {
 	/// Drop the loaded values, keeping which parts use which id. A dropped id is requested
 	/// again as any missing one.
 	dropValues(): void {
+		this._attempts.clear();
 		this._cache.clear();
 		this._requests.forgetAll();
 	}
 
 	clear(): void {
+		this._attempts.clear();
 		this._cache.clear();
 		this._requests.forgetAll();
 		this._unavailable.clear();

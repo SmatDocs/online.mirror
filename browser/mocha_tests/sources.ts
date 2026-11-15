@@ -34,6 +34,7 @@
 /// <reference path="../src/app/RenderManagerBase.ts" />
 /// <reference path="../src/app/BitmapTileManager.ts" />
 /// <reference path="ImpressPreviewStartup.test.ts" />
+/// <reference path="VectorResourceRetry.test.ts" />
 /// <reference path="../src/app/SelectionSnap.ts" />
 /// <reference path="../src/app/HandleScaling.ts" />
 /// <reference path="../src/app/SelectionHandles.ts" />
