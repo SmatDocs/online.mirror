@@ -5,7 +5,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-work, recipe = map(Path, sys.argv[1:])
+work, recipe = map(Path, sys.argv[1:3])
+variant = sys.argv[3] if len(sys.argv) > 3 else 'writer-only'
+if variant not in ['writer-only', 'full-fonts']:
+    raise ValueError('Unknown build variant')
+full_fonts = variant == 'full-fonts'
+folders = ['raw-full-fonts', 'packed-full-fonts'] if full_fonts else ['raw', 'packed']
+manifest_name = 'manifest-full-fonts.json' if full_fonts else 'manifest.json'
 
 
 def digest(path):
@@ -18,8 +24,8 @@ def digest(path):
 
 manifest = {
     'experimental': True,
-    'profile': 'writer-only baseline; optional patches not applied',
-    'applications': ['writer'],
+    'profile': 'full applications with portable font registration' if full_fonts else 'writer-only baseline; optional patches not applied',
+    'applications': ['writer', 'calc', 'impress'] if full_fonts else ['writer'],
     'core': subprocess.check_output(['git', '-C', str(work / 'core'), 'rev-parse', 'HEAD'], text=True).strip(),
     'emsdk': subprocess.check_output(['git', '-C', str(work / 'sdk'), 'rev-parse', 'HEAD'], text=True).strip(),
     'configure': (work / 'core/autogen.input').read_text().splitlines(),
@@ -32,14 +38,17 @@ manifest['sourceDiffFiles'] = subprocess.check_output(
     ['git', '-C', str(work / 'core'), 'diff', '--name-only'], text=True).splitlines()
 manifest['appliedPatches'] = ['reference-build/lo-source.patch'] + [
     str(path.relative_to(recipe)) for path in sorted((recipe / 'reference-build/patches').glob('*.patch'))]
-manifest['optionalRecipePatchesNotApplied'] = [path.name for path in sorted(recipe.glob('*.patch'))]
+if full_fonts:
+    manifest['appliedPatches'].append('portable-font-registration.patch')
+manifest['optionalRecipePatchesNotApplied'] = [path.name for path in sorted(recipe.glob('*.patch'))
+    if path.name not in manifest['appliedPatches']]
 for path in sorted(recipe.rglob('*')):
     if path.is_file():
         manifest['recipeFiles'][str(path.relative_to(recipe))] = digest(path)
-for folder in ['raw', 'packed']:
+for folder in folders:
     for path in sorted((work / folder).iterdir()):
         if path.is_file():
             manifest['artifacts'][str(path.relative_to(work))] = {
                 'bytes': path.stat().st_size, 'sha256': digest(path),
             }
-(work / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+(work / manifest_name).write_text(json.dumps(manifest, indent=2) + '\n')
