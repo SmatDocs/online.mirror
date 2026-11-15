@@ -1,5 +1,27 @@
 # Overten browser-engine experiments
 
+The complete-application/font-registration build has now finished and passed
+Word, rich Word and three-application browser-worker checks. The Writer-only
+profile below remains rejected. The `starter-fonts` resource profile reuses
+that complete binary, keeping 27 common/math/symbol font files at startup and
+preserving 99 others as separate optional files. It requires a complete build
+manifest with the portable font-registration patch; it is not a default.
+
+```sh
+python3 package-resources.py --source /path/to/full-fonts --output /path/to/new-empty-overlay --profile starter-fonts
+```
+
+The output is a resource overlay; use unchanged JS/WASM from the exact source
+artifact. `package-manifest.json` identifies optional bytes and engine hash.
+Registration of required fonts must finish before document import. Automatic
+document-font selection and production app integration are not supplied here.
+In a matched prepared-module Word test, boot was 15.888 / 5.466 s and browser
+PSS 1,182 / 1,009 MiB for full/starter; other starter boots were 4.579–4.911 s.
+Base wire package was 80.0 / 62.3 MB, before optional fonts. Rich objects and
+Word/Excel/slides round trips passed. Restoring the multilingual fixture's
+fonts took 946 ms and retained exact pixels, but gave no final RAM saving
+(1,104 / 1,105 MiB). These fixtures are not signed-in real-agent acceptance.
+
 This recipe builds an **experimental Writer-only headless reference**, not the
 production Collabora revision. It retains JS UNO and the exact reference
 patches so results can be compared with the three-application headless trial.
@@ -56,10 +78,10 @@ being present in this recipe directory does not mean a patch was built.
   secondary providers. Native binding generation and a reversible registration
   filter passed the current Word contract; a smaller WASM build is still pending.
   This is not a port of every Python UNO operation or a general UNO API promise.
-- `portable-font-registration.patch`: exposes the existing portable `addfont`
-  implementation to Emscripten for a later starter-font experiment. It has not
-  been compiled/runtime-qualified. It deletes no fonts. Late font registration,
-  layout fidelity and offline behavior must pass before adoption.
+- `portable-font-registration.patch`: exposes portable `addfont` to Emscripten.
+  The completed full-application build passes native registration and exact
+  multilingual save/reopen pixels. It deletes no fonts. Automatic font selection,
+  integrated app behavior and offline acceptance remain unfinished.
 - `clear-render-buffer.patch`: zeroes the reference renderer's allocated pixel
   buffer before painting. This removed uninitialized unused-margin differences
   in comparisons. It changes the diagnostic reference renderer, not core code.

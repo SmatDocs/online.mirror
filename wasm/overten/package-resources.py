@@ -15,7 +15,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', required=True, type=Path)
 parser.add_argument('--output', required=True, type=Path)
-parser.add_argument('--profile', required=True, choices=['ui-pruned', 'lazy-fonts', 'combined'])
+parser.add_argument('--profile', required=True, choices=['ui-pruned', 'lazy-fonts', 'combined', 'starter-fonts'])
 args = parser.parse_args()
 source, output = args.source.resolve(), args.output.resolve()
 if output == source or source in output.parents:
@@ -23,6 +23,12 @@ if output == source or source in output.parents:
 if output.exists() and any(output.iterdir()):
     raise ValueError('Output must be empty; never overwrite a measured variant')
 output.mkdir(parents=True, exist_ok=True)
+if args.profile == 'starter-fonts':
+    build = json.loads((source / 'build-manifest.json').read_text())
+    if not {'writer', 'calc', 'impress'}.issubset(build['applications']) or \
+            'portable-font-registration.patch' not in build['appliedPatches']:
+        raise ValueError('Starter fonts require the complete engine with portable font registration')
+    (output / 'optional-fonts').mkdir()
 metadata = json.loads((source / 'soffice.data.js.metadata').read_text())
 data = (source / 'soffice.data').read_bytes()
 pack = (source / 'soffice.lazy').read_bytes()
@@ -36,6 +42,7 @@ eager = []
 lazy = []
 removed = []
 moved = []
+deferred = []
 
 
 def check_path(name):
@@ -57,6 +64,12 @@ for entry in metadata['files']:
     blob = data[start:end]
     if remove(name):
         removed.append({'path': name, 'bytes': len(blob)})
+    elif args.profile == 'starter-fonts' and name.lower().endswith(('.ttf', '.otf', '.ttc')) and \
+            not Path(name).name.startswith(('Carlito-', 'Caladea-', 'Liberation', 'DejaVuMath', 'opens___')):
+        filename = Path(name).name
+        (output / 'optional-fonts' / filename).write_bytes(blob)
+        deferred.append({'name': filename, 'bytes': len(blob),
+                         'sha256': hashlib.sha256(blob).hexdigest()})
     elif args.profile in ['lazy-fonts', 'combined'] and name.lower().endswith(('.ttf', '.otf', '.ttc')):
         compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
         compressed = compressor.compress(blob) + compressor.flush()
@@ -86,6 +99,8 @@ for name, size, blob in lazy:
     offset += len(blob)
 encoded_index = json.dumps(new_index, separators=(',', ':')).encode()
 new_pack = b'LAZY' + struct.pack('<I', len(encoded_index)) + encoded_index + b''.join(blobs)
+if args.profile == 'starter-fonts':
+    new_pack = pack
 artifacts = {
     'soffice.data': bytes(new_data),
     'soffice.data.js.metadata': json.dumps({**metadata, 'files': files,
@@ -94,7 +109,7 @@ artifacts = {
 }
 manifest = {'profile': args.profile, 'source': {}, 'artifacts': {}, 'removed': removed,
             'movedToCompressedLazyPack': moved, 'fontsDeleted': 0,
-            'browserQualified': False}
+            'browserQualified': False, 'optionalFonts': deferred}
 for name in ['soffice.js', 'soffice.wasm', 'soffice.data', 'soffice.data.js.metadata', 'soffice.lazy']:
     path = source / name
     manifest['source'][name] = {'bytes': path.stat().st_size,
@@ -112,4 +127,12 @@ for name, blob in artifacts.items():
                                   'compressedInputReused': reuse,
                                   'sha256': hashlib.sha256(blob).hexdigest()}
 (output / 'variant.json').write_text(json.dumps(manifest, indent=2) + '\n')
+if args.profile == 'starter-fonts':
+    (output / 'package-manifest.json').write_text(json.dumps({
+        'sourceBytes': len(data), 'starterBytes': len(new_data),
+        'sourceDataWireBytes': (source / 'soffice.data.gz').stat().st_size,
+        'starterDataWireBytes': (output / 'soffice.data.gz').stat().st_size,
+        'keptFontFiles': [e['filename'] for e in files if e['filename'].lower().endswith(('.ttf', '.otf', '.ttc'))],
+        'deferred': deferred, 'engineSha256': manifest['source']['soffice.wasm']['sha256'],
+    }, indent=2) + '\n')
 print(json.dumps({k: v for k, v in manifest.items() if k not in ['removed', 'movedToCompressedLazyPack']}, indent=2))
