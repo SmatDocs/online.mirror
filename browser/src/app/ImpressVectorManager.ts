@@ -19,6 +19,23 @@
  */
 
 class ImpressVectorManager extends VectorPartManagerBase {
+	// Reuse the existing PNG preview decoding and acknowledgement path. This
+	// helper is never initialized as the document's tile renderer.
+	private _previewTiles = new BitmapTileManager();
+
+	onTileMsg(textMsg: string, img: any): void {
+		if (app.socket.parseServerCmd(textMsg).id !== undefined)
+			this._previewTiles.onTileMsg(textMsg, img);
+	}
+
+	onTileGoneMsg(textMsg: string): void {
+		this._previewTiles.onTileGoneMsg(textMsg);
+	}
+
+	sendProcessedResponse(): void {
+		this._previewTiles.sendProcessedResponse();
+	}
+
 	kind(): RenderManagerKind {
 		return 'slides';
 	}
@@ -634,6 +651,30 @@ class ImpressVectorManager extends VectorPartManagerBase {
 	): void {
 		const partId = this.partIdAt(part, mode);
 		if (partId === undefined) return;
+		if (
+			this._docLayer._docType === 'presentation' &&
+			window.coolParams?.get('rasterpreviews') === 'true'
+		) {
+			// A small preview must not fetch the slide's full-resolution images
+			// and fonts ahead of the slide the user is opening. The existing
+			// bitmap preview queue requests only thumbnails visible in the rail.
+			const dimensions =
+				this._docLayer.getPartDimensions?.(part) ??
+				app.activeDocument?.fileSize;
+			if (!dimensions) return;
+			app.map.getCustomPreview(
+				id,
+				part,
+				maxWidth,
+				maxHeight,
+				0,
+				0,
+				dimensions.x,
+				dimensions.y,
+				{ autoUpdate: true },
+			);
+			return;
+		}
 		const cached = this._cache.get(partId);
 		if (cached) this._revalidateIfStale(cached);
 		if (cached && this._isDrawable(cached)) {

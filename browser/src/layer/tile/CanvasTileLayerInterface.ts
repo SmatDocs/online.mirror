@@ -14,6 +14,7 @@ namespace cool {
 	export interface CanvasTileLayerInterface {
 		_selectedPart: number;
 		_docType: string;
+		getPartDimensions?(partIndex: number): cool.Point;
 		/// The id the document gave this client's view, or undefined until it
 		/// has been reported.
 		_viewId?: number;

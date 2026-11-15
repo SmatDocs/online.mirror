@@ -65,6 +65,17 @@ interface MapInterface extends Evented {
 	isPresentationOrDrawing(): boolean;
 
 	getDocSize(): cool.Point;
+	getCustomPreview(
+		id: cool.PreviewId,
+		part: number,
+		width: number,
+		height: number,
+		tilePosX: number,
+		tilePosY: number,
+		tileWidth: number,
+		tileHeight: number,
+		options: { autoUpdate: boolean },
+	): void;
 	getContainer(): Element;
 	_getCurrentFontName(): string;
 
