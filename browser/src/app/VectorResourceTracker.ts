@@ -40,6 +40,17 @@ class VectorResourceTracker<K, V> {
 		this._requestCached = requestCached;
 	}
 
+	areLoadedFor(parts: Set<cool.VectorPartGuid>): boolean {
+		for (const [id, owners] of this._idToParts) {
+			if (
+				!this._cache.has(id) &&
+				Array.from(owners).some((owner) => parts.has(owner))
+			)
+				return false;
+		}
+		return true;
+	}
+
 	has(id: K): boolean {
 		return this._cache.has(id);
 	}

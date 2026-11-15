@@ -22,6 +22,47 @@ class ImpressVectorManager extends VectorPartManagerBase {
 	// Reuse the existing PNG preview decoding and acknowledgement path. This
 	// helper is never initialized as the document's tile renderer.
 	private _previewTiles = new BitmapTileManager();
+	private _openingPreview =
+		window.coolParams?.get('openingpreview') === 'true'
+			? new ImpressOpeningPreview(
+					(partId) => {
+						const data = this._cache.get(partId);
+						if (
+							!data ||
+							(data.masterPartId && !this._cache.has(data.masterPartId))
+						)
+							return false;
+						const owners = new Set([partId]);
+						if (data.masterPartId) owners.add(data.masterPartId);
+						return (
+							this._resources.fonts.areLoadedFor(owners) &&
+							this._resources.images.areLoadedFor(owners)
+						);
+					},
+					(partId) => this._cache.get(partId)?.masterPartId,
+					() => this.setVisualsReady(),
+				)
+			: undefined;
+
+	acceptOutgoingMessage(message: string): boolean {
+		return this._openingPreview?.outgoing(message) ?? true;
+	}
+
+	drawOpeningPreview(
+		context: CanvasRenderingContext2D,
+		part: number,
+		mode: number,
+	): boolean {
+		return (
+			this._openingPreview?.draw(context, this.partIdAt(part, mode), mode) ??
+			false
+		);
+	}
+
+	changedHere(): void {
+		this._openingPreview?.localChange();
+		super.changedHere();
+	}
 
 	onTileMsg(textMsg: string, img: any): void {
 		if (app.socket.parseServerCmd(textMsg).id !== undefined)
@@ -119,6 +160,7 @@ class ImpressVectorManager extends VectorPartManagerBase {
 			next.size === this._hiddenLayers.size &&
 			ids.every((id) => this._hiddenLayers.has(id));
 		if (same) return;
+		this._openingPreview?.discard('layer visibility changed');
 		this._hiddenLayers = next;
 		// Hiding a layer changes nothing at the engine, so no object is answered.
 		this._fireChanged([]);
@@ -809,6 +851,7 @@ class ImpressVectorManager extends VectorPartManagerBase {
 
 	/// Redraw what is on screen in the view's current theme, the previews too.
 	refreshTheme(): void {
+		this._openingPreview?.discard('theme changed');
 		for (const [id, info] of this._renderedPreviews) {
 			const data = this._cache.get(info.partId);
 			if (data) this._renderAndFire(id, info.maxWidth, info.maxHeight, data);
@@ -818,6 +861,7 @@ class ImpressVectorManager extends VectorPartManagerBase {
 
 	/// Drop all cached data for all parts, and the previews drawn from them.
 	discardAllCache(): void {
+		this._openingPreview?.discard('document cache discarded');
 		this._pendingPreviews.clear();
 		this._renderedPreviews.clear();
 		super.discardAllCache();
@@ -841,6 +885,7 @@ class ImpressVectorManager extends VectorPartManagerBase {
 		data: cool.VectorPrimitivesData,
 		whole: boolean,
 	): void {
+		this._openingPreview?.partArrived(data, whole);
 		const partId = data.partId;
 		if (whole) {
 			const drained = this._drainDrawable(partId);

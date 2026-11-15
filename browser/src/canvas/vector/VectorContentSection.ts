@@ -134,6 +134,7 @@ namespace cool {
 						app.activeDocument.activeLayout.viewedRectangle.pY1,
 					app.twipsToPixels,
 				);
+			if (RenderManager.drawOpeningPreview(this.context, part, mode)) return;
 			if (!cached) {
 				// Data not ready. Blit the prior frame only when it holds
 				// the page now at this index, so the view keeps the current

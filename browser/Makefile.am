@@ -484,6 +484,7 @@ COOL_JS_LST =\
 	src/app/VectorResourceLoader.ts \
 	src/app/VectorManagerBase.ts \
 	src/app/VectorPartManagerBase.ts \
+	src/app/impress/OpeningPreview.ts \
 	src/app/ImpressVectorManager.ts \
 	src/app/WriterVectorManager.ts \
 	src/app/ImageDecoderPolyfill.ts \

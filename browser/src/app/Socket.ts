@@ -293,6 +293,9 @@ class Socket {
 
 		if (this._map.uiManager && this._map.uiManager.isUIBlocked()) return;
 
+		if (typeof msg === 'string' && !RenderManager.acceptOutgoingMessage(msg))
+			return;
+
 		// A caret moved here goes to the engine ahead of a message that may read or move
 		// it.
 		if (typeof msg === 'string') msg = LocalCaret.tellBefore(msg);

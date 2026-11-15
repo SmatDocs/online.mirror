@@ -85,6 +85,26 @@ class RenderManager {
 		return instance instanceof WriterVectorManager ? instance : undefined;
 	}
 
+	static acceptOutgoingMessage(message: string): boolean {
+		const instance = RenderManager._instance;
+		return (
+			!(instance instanceof ImpressVectorManager) ||
+			instance.acceptOutgoingMessage(message)
+		);
+	}
+
+	static drawOpeningPreview(
+		context: CanvasRenderingContext2D,
+		part: number,
+		mode: number,
+	): boolean {
+		const instance = RenderManager._instance;
+		return (
+			instance instanceof ImpressVectorManager &&
+			instance.drawOpeningPreview(context, part, mode)
+		);
+	}
+
 	private static ensureInstance(): RenderManagerBase {
 		// Provisional default before the document type is known.
 		if (!RenderManager._instance)
