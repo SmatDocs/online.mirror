@@ -29,12 +29,14 @@ class VectorResourceLoader {
 	/// The loaded font faces by font id.
 	readonly fonts = new VectorResourceTracker<string, FontFace>(
 		(fontId) => 'commandvalues command=.uno:VectorRenderingFont?id=' + fontId,
-		async (fontId) => {
-			const generation = this._generation;
-			const bytes = await this._fontBytes.get(fontId);
-			if (generation !== this._generation) return true;
-			return bytes ? this._registerFont(fontId, bytes, true) : false;
-		},
+		window.coolParams?.get('fontcache') === 'true'
+			? async (fontId) => {
+					const generation = this._generation;
+					const bytes = await this._fontBytes.get(fontId);
+					if (generation !== this._generation) return true;
+					return bytes ? this._registerFont(fontId, bytes, true) : false;
+				}
+			: undefined,
 	);
 
 	/// Called with the owners whose content names an image or a font that has just loaded, or

@@ -4,9 +4,10 @@ cd /work
 exec > >(tee -a /work/build.log) 2>&1
 trap 'code=$?; printf "exit=%s finished=%s\n" "$code" "$(date -u +%FT%TZ)" > /work/build-status.txt' EXIT
 printf 'started=%s\n' "$(date -u +%FT%TZ)" > /work/build-status.txt
-sha256sum source.tar.gz | tee source.sha256
+sha256sum source.tar.gz source-support.tar.gz /recipe/bootstrap.sh /recipe/build.sh | tee source.sha256
 mkdir -p source tarballs artifacts
 tar -xzf source.tar.gz -C source
+tar -xzf source-support.tar.gz -C source
 test -f source/engine/configure.ac
 test ! -e source/.env
 cp /work/source-revision.txt source/dist_git_hash
@@ -19,8 +20,8 @@ export LC_ALL=C.UTF-8
 export TZ=UTC
 cd /work/source/engine
 ./autogen.sh --with-distro=CPLinux-LOKit --without-package-format \
-    --with-parallelism=4 --disable-symbols --with-external-tar=/work/tarballs
-make -j4 build-nocheck
+    --with-parallelism=4 --disable-symbols --with-lang=en-US --with-external-tar=/work/tarballs
+make -j4 build
 printf 'core-built=%s\n' "$(date -u +%FT%TZ)" >> /work/build-status.txt
 # Record a focused real-core check; retain the build even if its test fails.
 set +e

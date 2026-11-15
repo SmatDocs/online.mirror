@@ -136,4 +136,5 @@
 /// <reference path="./SidebarVisibility.test.ts" />
 /// <reference path="./InitialLoadingScreen.test.ts" />
 /// <reference path="./RenameInteraction.test.ts" />
+/// <reference path="./VectorPeerRequests.test.ts" />
 // NOTE: reference new tests here ...

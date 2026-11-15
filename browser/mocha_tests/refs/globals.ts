@@ -72,7 +72,10 @@ noopClass.addInitHook = () => {};
 	dpiScale: 1,
 	twipsToPixels: 1 / 15,
 	pixelsToTwips: 15,
-	sectionContainer: {},
+	sectionContainer: {
+		getDocumentBackgroundColor: () => '#FFFFFF',
+		onCursorPositionChanged() {},
+	},
 	socket: {},
 	// Loader-time stubs: source files touch these at module-load time.
 	// In the browser, js/global.js + setLogging(true) populate app.console

@@ -212,6 +212,7 @@
 /// <reference path="../src/canvas/sections/RenderGeometrySection.ts" />
 /// <reference path="../src/layer/tile/CanvasTileLayerInterface.ts" />
 /// <reference path="../src/app/VectorResourceTracker.ts" />
+/// <reference path="../src/app/VectorFontCache.ts" />
 /// <reference path="../src/app/VectorResourceLoader.ts" />
 /// <reference path="../src/app/VectorManagerBase.ts" />
 /// <reference path="../src/app/VectorPartManagerBase.ts" />

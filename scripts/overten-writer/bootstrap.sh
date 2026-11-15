@@ -14,9 +14,9 @@ apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=60 install -y --no-insta
     libavahi-client-dev libpoco-dev libcppunit-dev libpng-dev libcap-dev \
     libpam0g-dev libzstd-dev libssl-dev chrpath nodejs npm gosu
 dpkg-query -W > /work/packages.tsv
-groupadd --gid 10001 builder
-useradd --uid 10001 --gid 10001 --create-home builder
+getent group 10001 > /dev/null || groupadd --gid 10001 builder
+getent passwd 10001 > /dev/null || useradd --uid 10001 --gid 10001 --create-home builder
 chown 10001:10001 /work /work/packages.tsv
 # The upload is atomic; never unpack an incomplete source stream.
 timeout 1h bash -c 'until test -f /work/source.tar.gz; do sleep 5; done'
-exec gosu builder bash /recipe/build.sh
+exec gosu 10001:10001 bash /recipe/build.sh
