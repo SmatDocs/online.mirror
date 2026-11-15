@@ -196,23 +196,17 @@ namespace cool {
 		}
 
 		private _drawFileBasedView(): void {
-			const docLayer = this._docLayer;
-			const partHeightPixels = Math.round(
-				(docLayer._partHeightTwips + docLayer._spaceBetweenParts) *
-					app.twipsToPixels,
+			const layout = app.activeDocument.activeLayout;
+			if (layout.type !== 'ViewLayoutFileBased') return;
+			const pages = layout as ViewLayoutFileBased;
+			if (!pages.viewRectangles.length) return;
+			const viewedRectangle = pages.viewedRectangle;
+			const topVisible = pages.getPartIndexAtDocumentY(viewedRectangle.pY1);
+			const bottomVisible = pages.getPartIndexAtDocumentY(
+				viewedRectangle.pY1 + viewedRectangle.pHeight,
 			);
-			if (partHeightPixels <= 0) return;
-
-			const viewedRectangle = app.activeDocument.activeLayout.viewedRectangle;
-			let topVisible = Math.floor(viewedRectangle.pY1 / partHeightPixels);
-			let bottomVisible = Math.ceil(
-				(viewedRectangle.pY1 + viewedRectangle.pHeight) / partHeightPixels,
-			);
-			topVisible = Math.max(0, topVisible);
-			bottomVisible = Math.min(bottomVisible, docLayer._parts - 1);
 
 			const scale = app.twipsToPixels;
-			const offsetX = -viewedRectangle.pX1;
 
 			for (let part = topVisible; part <= bottomVisible; part++) {
 				// The file-based view scrolls the slides, never a master page. A slide is
@@ -225,7 +219,11 @@ namespace cool {
 					: undefined;
 				if (!cached) continue;
 
-				const offsetY = -viewedRectangle.pY1 + part * partHeightPixels;
+				// Share the tile path's centered, per-page layout rather than assuming
+				// identical heights and placing every page against the canvas edge.
+				const page = pages.viewRectangles[part];
+				const offsetX = page.pX1 - viewedRectangle.pX1;
+				const offsetY = page.pY1 - viewedRectangle.pY1;
 
 				this.context.save();
 				this.context.translate(offsetX, offsetY);
