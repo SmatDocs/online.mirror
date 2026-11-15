@@ -1107,6 +1107,10 @@ window.L.Map.WOPI = window.L.Handler.extend({
 				app.socket.sendMessage('versionrestore prerestore');
 			}
 		}
+		else if (msg.MessageId === 'Host_OfficeActivity' &&
+			 msg.Values && typeof msg.Values.Busy === 'boolean') {
+			this._map.fire('officeagentactivity', {busy: msg.Values.Busy});
+		}
 		else if (msg.MessageId === 'CallPythonScript' &&
 			 Object.prototype.hasOwnProperty.call(msg, 'ScriptFile') &&
 			 Object.prototype.hasOwnProperty.call(msg, 'Function')) {

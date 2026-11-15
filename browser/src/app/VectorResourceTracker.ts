@@ -19,6 +19,9 @@ class VectorResourceTracker<K, V> {
 	private static readonly requestTimeout = 60000;
 	private static readonly maxAttempts = 2;
 	private _attempts = new Map<K, number>();
+	private _concurrency = Infinity;
+	private _waiting = new Set<K>();
+	private _draining = false;
 
 	private _cache: Map<K, V> = new Map();
 	private _requests = new cool.RequestTracker<K>({
@@ -49,6 +52,30 @@ class VectorResourceTracker<K, V> {
 				return false;
 		}
 		return true;
+	}
+
+	/// Limit actual requests, without starting timeout clocks for queued resources.
+	setConcurrencyLimit(limit: number): void {
+		this._concurrency = Math.max(0, Math.floor(limit));
+		this._drainWaiting();
+	}
+
+	private _drainWaiting(): void {
+		if (this._draining) return;
+		this._draining = true;
+		try {
+			for (const id of Array.from(this._waiting)) {
+				if (!this._idToParts.has(id)) {
+					this._waiting.delete(id);
+					continue;
+				}
+				if (this._requests.requestCount >= this._concurrency) break;
+				this._waiting.delete(id);
+				this.requestMissing(new Set([id]));
+			}
+		} finally {
+			this._draining = false;
+		}
 	}
 
 	has(id: K): boolean {
@@ -86,6 +113,7 @@ class VectorResourceTracker<K, V> {
 		for (const [id, parts] of Array.from(this._idToParts.entries())) {
 			if (!parts.delete(partId) || parts.size > 0) continue;
 			this._idToParts.delete(id);
+			this._waiting.delete(id);
 			this._cache.delete(id);
 		}
 	}
@@ -101,6 +129,7 @@ class VectorResourceTracker<K, V> {
 		for (const [id, parts] of Array.from(this._idToParts.entries())) {
 			if (ids.has(id) || !parts.delete(partId) || parts.size > 0) continue;
 			this._idToParts.delete(id);
+			this._waiting.delete(id);
 			if (dropUnused) this._cache.delete(id);
 		}
 		this.indexForPart(partId, ids);
@@ -109,12 +138,16 @@ class VectorResourceTracker<K, V> {
 	/// Forget that the part uses anything, keeping the values.
 	forgetPart(partId: cool.VectorPartGuid): void {
 		for (const [id, parts] of Array.from(this._idToParts.entries())) {
-			if (parts.delete(partId) && parts.size === 0) this._idToParts.delete(id);
+			if (parts.delete(partId) && parts.size === 0) {
+				this._idToParts.delete(id);
+				this._waiting.delete(id);
+			}
 		}
 	}
 
 	/// Forget which parts use what, keeping the values.
 	forgetAllParts(): void {
+		this._waiting.clear();
 		this._idToParts.clear();
 	}
 
@@ -123,7 +156,12 @@ class VectorResourceTracker<K, V> {
 	requestMissing(ids: Set<K>): void {
 		for (const id of ids) {
 			if (this._cache.has(id)) continue;
-			if (this._unavailable.has(id)) continue;
+			if (this._unavailable.has(id) || this._requests.isOut(id)) continue;
+			if (this._requests.requestCount >= this._concurrency) {
+				this._waiting.add(id);
+				continue;
+			}
+			this._waiting.delete(id);
 			this._requests.request(id, () => {
 				const request = () => {
 					if (this._requests.isOut(id)) {
@@ -156,6 +194,7 @@ class VectorResourceTracker<K, V> {
 			}
 		}
 		this.requestMissing(ids);
+		this._drainWaiting();
 	}
 
 	/// Store a loaded value, which answers the request for the id.
@@ -163,7 +202,9 @@ class VectorResourceTracker<K, V> {
 		this._attempts.delete(id);
 		this._unavailable.delete(id);
 		this._cache.set(id, value);
+		this._waiting.delete(id);
 		this._requests.answered(id);
+		this._drainWaiting();
 	}
 
 	/// Record an id no usable data could be obtained for, so it is not
@@ -171,12 +212,16 @@ class VectorResourceTracker<K, V> {
 	setUnavailable(id: K): void {
 		this._attempts.delete(id);
 		this._unavailable.add(id);
+		this._waiting.delete(id);
 		this._requests.answered(id);
+		this._drainWaiting();
 	}
 
 	/// The request for the id is answered without a value, so the id can be asked for again.
 	clearInFlight(id: K): void {
+		this._waiting.delete(id);
 		this._requests.answered(id);
+		this._drainWaiting();
 	}
 
 	/// Drop the loaded values, keeping which parts use which id. A dropped id is requested
@@ -185,12 +230,14 @@ class VectorResourceTracker<K, V> {
 		this._attempts.clear();
 		this._cache.clear();
 		this._requests.forgetAll();
+		this._waiting.clear();
 	}
 
 	clear(): void {
 		this._attempts.clear();
 		this._cache.clear();
 		this._requests.forgetAll();
+		this._waiting.clear();
 		this._unavailable.clear();
 		this._idToParts.clear();
 	}

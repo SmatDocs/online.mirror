@@ -12,6 +12,8 @@ describe('Impress opening preview', function () {
 		drawn: string[],
 		timers: Map<number, { fn: () => void; delay: number }>;
 	let serial: number;
+	let fontWindows: number[];
+	let activity: (event: { busy: boolean }) => void;
 	const part = {
 		partId: 'S0',
 		mode: 0,
@@ -47,6 +49,7 @@ describe('Impress opening preview', function () {
 			clearTimeout: window.clearTimeout,
 		};
 		loaded = false;
+		fontWindows = [];
 		messages = [];
 		drawn = [];
 		timers = new Map();
@@ -59,8 +62,9 @@ describe('Impress opening preview', function () {
 		(window as any).clearTimeout = (id: number) => timers.delete(id);
 		(window as any).coolParams = new URLSearchParams('openingpriority=true');
 		(app as any).map = {
-			on: (_name: string, fn: (event: any) => void) => {
-				received = fn;
+			on: (name: string, fn: (event: any) => void) => {
+				if (name === 'tilepreview') received = fn;
+				if (name === 'officeagentactivity') activity = fn;
 			},
 			off: () => {},
 			_docLayer: {
@@ -87,6 +91,7 @@ describe('Impress opening preview', function () {
 			() => loaded,
 			() => 'M0',
 			() => {},
+			(limit) => fontWindows.push(limit),
 		);
 		preview.outgoing('clientzoom tilepixelwidth=256');
 		preview.outgoing('clientvisiblearea width=100 height=100');
@@ -124,6 +129,7 @@ describe('Impress opening preview', function () {
 		answer(0, 'initial');
 		draw();
 		preview.localChange();
+		nodeassert.strictEqual(fontWindows.at(-1), 0);
 		draw();
 		nodeassert.strictEqual(drawn.length, 1);
 		preview.partArrived({ ...part, version: 2 }, false);
@@ -148,6 +154,7 @@ describe('Impress opening preview', function () {
 		loaded = true;
 		nodeassert.strictEqual(draw(), false);
 		nodeassert.strictEqual(preview.stats.closedReason, 'vectors ready');
+		nodeassert.strictEqual(fontWindows.at(-1), Infinity);
 		nodeassert.strictEqual(timers.size, 0);
 	});
 	it('keeps the preview for navigation and key release, and drops it for typing', function () {
@@ -160,6 +167,37 @@ describe('Impress opening preview', function () {
 		preview.outgoing('key type=input char=65 key=65');
 		draw();
 		nodeassert.strictEqual(drawn.length, 2);
+	});
+
+	it('keeps optional metadata and exact fonts behind actual host activity', function () {
+		activity({ busy: true });
+		nodeassert.strictEqual(fontWindows.at(-1), 0);
+		nodeassert.strictEqual(preview.outgoing('getpresentationinfo'), false);
+		nodeassert.strictEqual(
+			preview.outgoing('commandvalues command=.uno:CharFontName'),
+			false,
+		);
+		answer(0, 'initial');
+		draw();
+		nodeassert.strictEqual(fontWindows.at(-1), 0);
+		activity({ busy: false });
+		nodeassert.strictEqual(fontWindows.at(-1), 1);
+		nodeassert(messages.includes('getpresentationinfo'));
+		nodeassert(messages.includes('commandvalues command=.uno:CharFontName'));
+	});
+
+	it('restores loading after a missed host completion without extending the deadline', function () {
+		activity({ busy: true });
+		preview.outgoing('getpresentationinfo');
+		const deadline = Array.from(timers.values()).find(
+			(timer) => timer.delay === 45000,
+		)!;
+		activity({ busy: true });
+		nodeassert(Array.from(timers.values()).includes(deadline));
+		deadline.fn();
+		nodeassert.strictEqual(preview.stats.closedReason, 'host activity timeout');
+		nodeassert.strictEqual(fontWindows.at(-1), Infinity);
+		nodeassert(messages.includes('getpresentationinfo'));
 	});
 
 	it('bounds deferred reads and releases them after five seconds without retrying', function () {

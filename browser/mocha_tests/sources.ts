@@ -36,6 +36,7 @@
 /// <reference path="ImpressPreviewStartup.test.ts" />
 /// <reference path="ImpressOpeningPreview.test.ts" />
 /// <reference path="VectorResourceRetry.test.ts" />
+/// <reference path="VectorResourceConcurrency.test.ts" />
 /// <reference path="../src/app/SelectionSnap.ts" />
 /// <reference path="../src/app/HandleScaling.ts" />
 /// <reference path="../src/app/SelectionHandles.ts" />

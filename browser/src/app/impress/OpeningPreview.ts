@@ -29,6 +29,9 @@ class ImpressOpeningPreview {
 	private _holdTimer?: number;
 	private _held: string[] = [];
 	private _holdFinished = false;
+	private _agentBusy = window.coolParams?.get('agentbusy') === 'true';
+	private _agentTimer?: number;
+	private _agentMetadata = new Set<string>();
 	private _revisions = new Map<string, string>();
 	private _priority = window.coolParams?.get('openingpriority') === 'true';
 	readonly stats = {
@@ -48,12 +51,28 @@ class ImpressOpeningPreview {
 			partId: cool.VectorPartGuid,
 		) => cool.VectorPartGuid | undefined,
 		private readonly _visualsReady: () => void,
+		private readonly _fontWindow: (limit: number) => void,
 	) {
 		app.map.on('tilepreview', this._receive);
+		app.map.on('officeagentactivity', this._agentActivity);
+		if (this._priority) {
+			this._setFontWindow(1);
+			if (this._agentBusy) this._agentActivity({ busy: true });
+		}
 	}
 
 	outgoing(message: string): boolean {
 		if (this._closed) return true;
+		if (
+			this._priority &&
+			this._agentBusy &&
+			(message === 'getpresentationinfo' ||
+				message.startsWith('commandvalues command=.uno:CharFontName')) &&
+			(this._agentMetadata.has(message) || this._agentMetadata.size < 4)
+		) {
+			this._agentMetadata.add(message);
+			return false;
+		}
 		if (
 			this._selected &&
 			(/^(uno |textinput |paste |changeset )/.test(message) ||
@@ -89,6 +108,7 @@ class ImpressOpeningPreview {
 	localChange(): void {
 		if (this._closed || !this._selected) return;
 		this._awaitingModel = true;
+		if (this._priority) this._setFontWindow(0);
 		this._invalidate();
 	}
 
@@ -254,6 +274,7 @@ class ImpressOpeningPreview {
 			this.stats.lastPaintMS = performance.now();
 			this.stats.firstPaintMS ||= this.stats.lastPaintMS;
 			this._visualsReady();
+			if (this._priority) this._setFontWindow(1);
 			app.console.debug(
 				'slide opening preview: generation=' +
 					this.stats.generation +
@@ -264,6 +285,30 @@ class ImpressOpeningPreview {
 		return true;
 	}
 	private _lastPaintGeneration = -1;
+
+	private _setFontWindow(limit: number): void {
+		this._fontWindow(this._agentBusy && limit !== Infinity ? 0 : limit);
+	}
+
+	private _agentActivity = (event: { busy: boolean }): void => {
+		if (this._closed || !this._priority) return;
+		if (event.busy && this._agentBusy && this._agentTimer !== undefined) return;
+		window.clearTimeout(this._agentTimer);
+		this._agentTimer = undefined;
+		this._agentBusy = event.busy;
+		if (event.busy) {
+			this._setFontWindow(0);
+			this._agentTimer = window.setTimeout(
+				() => this.discard('host activity timeout'),
+				45000,
+			);
+		} else {
+			const metadata = Array.from(this._agentMetadata);
+			this._agentMetadata.clear();
+			for (const message of metadata) app.socket.sendMessage(message);
+			if (!this._awaitingModel && this._current) this._setFontWindow(1);
+		}
+	};
 
 	private _flush(): void {
 		window.clearTimeout(this._holdTimer);
@@ -276,6 +321,12 @@ class ImpressOpeningPreview {
 	discard(reason: string): void {
 		if (this._closed) return;
 		this._closed = true;
+		window.clearTimeout(this._agentTimer);
+		this._agentBusy = false;
+		if (this._priority) this._setFontWindow(Infinity);
+		const metadata = Array.from(this._agentMetadata);
+		this._agentMetadata.clear();
+		for (const message of metadata) app.socket.sendMessage(message);
 		this.stats.closedReason = reason;
 		window.clearTimeout(this._updateTimer);
 		window.clearTimeout(this._requestTimer);
@@ -285,5 +336,6 @@ class ImpressOpeningPreview {
 		this._image = undefined;
 		this._revisions.clear();
 		app.map.off('tilepreview', this._receive);
+		app.map.off('officeagentactivity', this._agentActivity);
 	}
 }

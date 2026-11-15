@@ -41,6 +41,7 @@ class ImpressVectorManager extends VectorPartManagerBase {
 					},
 					(partId) => this._cache.get(partId)?.masterPartId,
 					() => this.setVisualsReady(),
+					(limit) => this._resources.fonts.setConcurrencyLimit(limit),
 				)
 			: undefined;
 
@@ -861,6 +862,7 @@ class ImpressVectorManager extends VectorPartManagerBase {
 
 	/// Drop all cached data for all parts, and the previews drawn from them.
 	discardAllCache(): void {
+		if (this._openingPreview) this._resources.fonts.forgetAllParts();
 		this._openingPreview?.discard('document cache discarded');
 		this._pendingPreviews.clear();
 		this._renderedPreviews.clear();
